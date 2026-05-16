@@ -76,9 +76,9 @@ RUN mkdir -p logs uploads/avatars uploads/documents uploads/chat uploads/vehicle
 # Copy application code
 COPY . .
 
-# Create non-root user for security
-RUN addgroup -S node && adduser -S -G node node && \
-    chown -R node:node /app
+# L'image node:20-alpine fournit DEJA l'utilisateur/groupe 'node'.
+# On reutilise cet utilisateur (addgroup/adduser echouait : deja existant).
+RUN chown -R node:node /app
 
 USER node
 
