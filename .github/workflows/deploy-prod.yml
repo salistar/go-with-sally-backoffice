@@ -49,10 +49,8 @@ jobs:
             context: ./gowithsally-web
             file: ./gowithsally-web/Dockerfile
             target: ""
-          - name: gws-face-api
-            context: ./gowithsally-face-api
-            file: ./gowithsally-face-api/Dockerfile
-            target: production
+          # gws-face-api : NON build/deploye (modeles ML ~2.3 GB absents
+          # de l'image + RAM VPS insuffisante). A reactiver ulterieurement.
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -81,20 +79,36 @@ jobs:
     steps:
       - name: SSH deploy sur le VPS
         uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER,SHA
           script: |
             set -e
-            cd ~/apps/go-with-sally-backoffice
-            git pull --ff-only origin main
-            export IMAGE_TAG=${{ github.sha }}
-            PROFILES=""
-            if [ "${{ github.event.inputs.with_elk }}" = "true" ]; then PROFILES="--profile elk"; fi
-            docker compose --env-file .env.production -f docker-compose.vps.yml pull
-            docker compose --env-file .env.production -f docker-compose.vps.yml $PROFILES up -d
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            APP=~/apps/go-with-sally-backoffice
+            if [ ! -d "$APP/.git" ]; then
+              git clone https://github.com/salistar/go-with-sally-backoffice.git "$APP"
+            fi
+            cd "$APP"
+            git fetch origin main
+            git reset --hard origin/main
+            if [ ! -f .env.production ]; then
+              echo "ERREUR: .env.production absent sur le VPS (prerequis non fait)"; exit 1
+            fi
+            export IMAGE_TAG="$SHA"
+            # Deploie UNIQUEMENT backend + web (pas de face-api : modeles ML
+            # absents + RAM ; pas d'ELK). Mongo/Redis = conteneurs SallyCards
+            # reutilises via le reseau externe (SHARED_DB_NETWORK).
+            docker compose --env-file .env.production -f docker-compose.vps.yml pull backend web
+            docker compose --env-file .env.production -f docker-compose.vps.yml up -d backend web
             docker image prune -f
+            docker compose --env-file .env.production -f docker-compose.vps.yml ps
 
   cloudflare-purge:
     needs: deploy
@@ -118,10 +132,18 @@ jobs:
     needs: deploy
     runs-on: ubuntu-22.04
     steps:
-      - name: Verifier les endpoints publics
-        run: |
-          set -e
-          curl -fsS  https://api.gowithsally.salistar.com/health
-          curl -fsS  https://aigowithsally.salistar.com/api/health/ping
-          curl -fsSI https://gowithsally.salistar.com | head -n1
-          echo "Health-check OK"
+      - name: Health-check local sur le VPS (backend + web)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            echo "--- conteneurs ---"
+            docker ps --filter name=gws- --format "{{.Names}} | {{.Status}}"
+            echo "--- backend /health ---"
+            curl -fsS http://127.0.0.1:5000/health && echo
+            echo "--- web ---"
+            curl -fsSI http://127.0.0.1:3100/ | head -n1
+            echo "Health-check OK (acces public via Cloudflare a configurer separement)"
