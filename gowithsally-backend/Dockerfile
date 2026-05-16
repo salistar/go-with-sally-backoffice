@@ -66,7 +66,9 @@ ENV NODE_ENV=production
 ENV LOG_LEVEL=info
 
 # Install production dependencies only
-RUN npm ci --omit=dev && npm cache clean --force
+# npm install (pas npm ci) : package-lock.json desynchronise du package.json
+# (meme contournement que la methode SallyCards : npm install --legacy-peer-deps)
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Create required directories
 RUN mkdir -p logs uploads/avatars uploads/documents uploads/chat uploads/vehicles
