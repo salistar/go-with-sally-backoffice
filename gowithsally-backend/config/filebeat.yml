@@ -1,0 +1,58 @@
+#=========================== Filebeat inputs ================================
+filebeat.inputs:
+
+# Application logs
+- type: log
+  enabled: true
+  paths:
+    - /app/logs/*.log
+    - /app/logs/**/*.log
+  fields:
+    service: "gowithsally-backend"
+  multiline.pattern: '^\['
+  multiline.negate: true
+  multiline.match: after
+  fields_under_root: true
+
+# JSON logs
+- type: log
+  enabled: true
+  paths:
+    - /app/logs/json/*.log
+  json.message_key: message
+  json.keys_under_root: true
+  json.add_error_key: true
+  fields:
+    service: "gowithsally-backend"
+  fields_under_root: true
+
+#================================ General =====================================
+name: "gowithsally-backend"
+tags: ["backend", "production"]
+
+#================================ Outputs =====================================
+output.logstash:
+  hosts: ["logstash:5045"]
+  bulk_max_size: 2048
+
+#================================ Logging ====================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+#================================ Processors =================================
+processors:
+  - add_kubernetes_metadata:
+      in_cluster: true
+  - add_docker_metadata: ~
+  - add_host_metadata: ~
+  - add_process_metadata: ~
+
+#================================ HTTP Endpoint ==============================
+http.enabled: true
+http.host: 0.0.0.0
+http.port: 5066

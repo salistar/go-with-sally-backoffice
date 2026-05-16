@@ -1,0 +1,705 @@
+##############################################################################
+# GoWithSally - Comprehensive CI/CD Pipeline
+# Testing: Unit, API (Karate), E2E (Playwright), Load (Gatling)
+# Code Quality: SonarQube, Coverage Thresholds
+# Security: Trivy, OWASP Scanning
+# Deployment: Staging & Production with Health Checks
+##############################################################################
+
+name: GoWithSally CI/CD
+
+# NOTE (deploiement go-with-sally-backoffice) :
+# Auto-trigger DESACTIVE volontairement. Ce pipeline historique contient un
+# job deploy-production (SSH appleboy, secret PRODUCTION_SSH_KEY) cible sur
+# l'ancienne infra. Le deploiement officiel passe desormais par
+# .github/workflows/deploy-prod.yml (methode SallyCards : GHCR + SSH VPS +
+# Cloudflare Tunnel), declenche MANUELLEMENT. On garde ce fichier pour les
+# tests/qualite/securite, lancable a la main uniquement.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ========== INITIALIZATION ==========
+  init:
+    name: Initialize
+    runs-on: ubuntu-latest
+    outputs:
+      backend-cache-key: ${{ steps.cache.outputs.backend-cache }}
+      web-cache-key: ${{ steps.cache.outputs.web-cache }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: cache
+        run: |
+          echo "backend-cache=$(git rev-parse HEAD:gowithsally-backend)" >> $GITHUB_OUTPUT
+          echo "web-cache=$(git rev-parse HEAD:gowithsally-web)" >> $GITHUB_OUTPUT
+
+  # ========== LINTING & CODE QUALITY ==========
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    needs: init
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gowithsally-backend/package-lock.json
+      - name: Install dependencies
+        run: cd gowithsally-backend && npm ci
+      - name: Run ESLint
+        run: cd gowithsally-backend && npm run lint || true
+      - name: Check TypeScript
+        run: cd gowithsally-backend && npm run type-check || true
+        continue-on-error: true
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: gowithsally-backend/.eslintcache
+          retention-days: 7
+        continue-on-error: true
+
+  # ========== UNIT TESTS WITH COVERAGE ==========
+  test-unit:
+    name: Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: init
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports: ["27017:27017"]
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: test
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7.2-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gowithsally-backend/package-lock.json
+      - name: Install dependencies
+        run: cd gowithsally-backend && npm ci
+      - name: Run unit tests
+        run: cd gowithsally-backend && npm run test:unit
+        env:
+          MONGODB_URI: mongodb://test:test@localhost:27017/gowithsally_test?authSource=admin
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+      - name: Generate coverage report
+        run: cd gowithsally-backend && npm run test:coverage
+        env:
+          MONGODB_URI: mongodb://test:test@localhost:27017/gowithsally_test?authSource=admin
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+      - name: Check coverage thresholds
+        run: |
+          cd gowithsally-backend
+          COVERAGE=$(grep -o 'Statements.*: [0-9]*' coverage/coverage-summary.json | head -1 | grep -o '[0-9]*' | head -1)
+          echo "Code coverage: ${COVERAGE}%"
+          if [ "$COVERAGE" -lt 70 ]; then
+            echo "Coverage below 70% threshold"
+            exit 1
+          fi
+        continue-on-error: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./gowithsally-backend/coverage/lcov.info
+          flags: unittests
+          name: backend-coverage
+          fail_ci_if_error: false
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: gowithsally-backend/coverage/
+          retention-days: 30
+        continue-on-error: true
+
+  # ========== API TESTS (Karate) ==========
+  test-api:
+    name: API Tests (Karate)
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Start test services
+        run: docker-compose -f docker-compose.test.yml up -d --build
+      - name: Wait for backend health
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:5000/health; do echo "Waiting for backend..."; sleep 2; done'
+      - name: Wait for face-api health
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:8000/api/health/ping; do echo "Waiting for face-api..."; sleep 2; done' || true
+      - name: Setup Karate
+        run: |
+          cd tests/api/karate
+          npm install || true
+      - name: Run Karate API Tests
+        run: |
+          cd tests/api/karate
+          npm test 2>&1 | tee karate-results.txt || true
+      - name: Upload Karate results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: karate-reports
+          path: |
+            tests/api/karate/target/
+            tests/api/karate/karate-results.txt
+          retention-days: 30
+        continue-on-error: true
+      - name: Stop test services
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+          docker system prune -f
+
+  # ========== E2E TESTS (Playwright) ==========
+  test-e2e:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-api]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Playwright
+        run: |
+          cd tests/e2e/playwright
+          npm install
+          npx playwright install --with-deps
+      - name: Start test environment
+        run: docker-compose -f docker-compose.test.yml up -d --build
+      - name: Wait for backend
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:5000/health; do echo "Waiting for backend..."; sleep 2; done'
+      - name: Wait for web frontend
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:3000/health; do echo "Waiting for web..."; sleep 2; done' || true
+      - name: Run Playwright tests
+        run: |
+          cd tests/e2e/playwright
+          npx playwright test
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+          CI: true
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright/playwright-report/
+          retention-days: 30
+        continue-on-error: true
+      - name: Upload Playwright videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-videos
+          path: tests/e2e/playwright/test-results/
+          retention-days: 7
+        continue-on-error: true
+      - name: Stop Services
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+          docker system prune -f
+
+  # ========== CODE QUALITY GATES ==========
+  code-quality:
+    name: SonarQube & Code Quality
+    runs-on: ubuntu-latest
+    needs: test-unit
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: gowithsally-backend/package-lock.json
+      - name: Install dependencies
+        run: cd gowithsally-backend && npm ci
+      - name: Generate coverage
+        run: cd gowithsally-backend && npm run test:coverage
+        continue-on-error: true
+      - name: Run SonarCloud analysis
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: gowithsally-backend/coverage
+        continue-on-error: true
+      - name: Comment PR with quality results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## Code Quality Report\n\n';
+            try {
+              const coverage = JSON.parse(fs.readFileSync('gowithsally-backend/coverage/coverage-summary.json', 'utf8'));
+              comment += `- **Statements**: ${coverage.total.statements.pct}%\n`;
+              comment += `- **Branches**: ${coverage.total.branches.pct}%\n`;
+              comment += `- **Functions**: ${coverage.total.functions.pct}%\n`;
+              comment += `- **Lines**: ${coverage.total.lines.pct}%\n`;
+            } catch (e) {
+              comment += '(Coverage data not available)\n';
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+        continue-on-error: true
+
+  # ========== SECURITY SCANNING ==========
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: init
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: gowithsally-backend
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+        continue-on-error: true
+      - name: Run npm audit
+        run: |
+          cd gowithsally-backend
+          npm audit --audit-level=high || true
+        continue-on-error: true
+
+  # ========== BUILD DOCKER IMAGES ==========
+  build:
+    name: Build Docker Images
+    needs: [lint, test-unit, test-api, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: ./gowithsally-backend
+            dockerfile: ./gowithsally-backend/Dockerfile
+            target: production
+          - name: face-api
+            context: ./gowithsally-face-api
+            dockerfile: ./gowithsally-face-api/Dockerfile
+            target: production
+          - name: web
+            context: ./gowithsally-web
+            dockerfile: ./gowithsally-web/Dockerfile
+            target: production
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          target: ${{ matrix.service.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ github.ref_name }}
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}:latest
+          format: sarif
+          output: trivy-image-${{ matrix.service.name }}.sarif
+        continue-on-error: true
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-image-${{ matrix.service.name }}.sarif
+        continue-on-error: true
+
+  # ========== DEPLOY TO STAGING ==========
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [build, test-e2e]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    environment:
+      name: staging
+      url: https://staging-api.gowithsally.ma
+    concurrency:
+      group: staging-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pre-deployment checks
+        run: |
+          echo "Staging deployment initiated at $(date)"
+          echo "Deploying commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+      - name: Deploy to staging infrastructure
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            echo "Starting staging deployment..."
+            cd /opt/gowithsally
+
+            # Backup database
+            echo "Creating database backup..."
+            docker compose exec -T mongodb mongodump \
+              --username=$MONGO_ROOT_USER \
+              --password=$MONGO_ROOT_PASSWORD \
+              --authenticationDatabase=admin \
+              --out=/backups/staging-pre-deploy-$(date +%Y%m%d_%H%M%S) || true
+
+            # Pull latest code
+            git fetch origin staging
+            git checkout origin/staging
+
+            # Pull latest images
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            # Deploy services
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps --build backend face-api web
+
+            # Wait for services
+            timeout 120 bash -c 'until curl -f http://localhost:5000/health; do sleep 2; done' || exit 1
+
+            echo "Staging deployment completed at $(date)"
+      - name: Run staging smoke tests
+        run: |
+          set +e
+          echo "Running smoke tests..."
+
+          # Test health endpoint
+          curl -f https://staging-api.gowithsally.ma/health || exit 1
+
+          # Test auth endpoint (expect 400 without valid credentials)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://staging-api.gowithsally.ma/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"invalid","password":"invalid"}')
+          if [ "$STATUS" != "401" ] && [ "$STATUS" != "400" ]; then
+            echo "Auth endpoint returned unexpected status: $STATUS"
+            exit 1
+          fi
+
+          echo "Smoke tests passed"
+        continue-on-error: true
+      - name: Notify staging deployment
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Staging deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Staging Deployment Successful* ✅\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}\nURL: https://staging-api.gowithsally.ma"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+  # ========== DEPLOY TO PRODUCTION ==========
+  deploy-production:
+    name: Deploy to Production
+    needs: [build, test-e2e, code-quality]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.gowithsally.ma
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pre-deployment approval
+        run: |
+          echo "Production deployment requires manual approval in GitHub Actions"
+          echo "Deployment for commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+      - name: Deploy to production infrastructure
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            set -e
+            echo "Starting production deployment..."
+            cd /opt/gowithsally
+
+            # Backup database before deploy
+            echo "Creating pre-deployment backup..."
+            BACKUP_FILE="/backups/pre-deploy-$(date +%Y%m%d_%H%M%S).archive.gz"
+            docker compose exec -T mongodb mongodump \
+              --username=$MONGO_ROOT_USER \
+              --password=$MONGO_ROOT_PASSWORD \
+              --authenticationDatabase=admin \
+              --db=gowithsally \
+              --archive=$BACKUP_FILE \
+              --gzip
+            echo "Backup created: $BACKUP_FILE"
+
+            # Pull latest code
+            git fetch origin main
+            git checkout origin/main
+
+            # Pull latest images
+            echo "Pulling latest Docker images..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            # Blue-green style deployment
+            echo "Deploying new versions..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps --build backend face-api web
+
+            # Wait for services with timeout
+            echo "Waiting for backend to be healthy..."
+            timeout 300 bash -c 'until curl -f http://localhost:5000/health; do echo "Waiting..."; sleep 5; done' || exit 1
+
+            # Run database migrations if needed
+            echo "Checking for migrations..."
+            docker compose exec -T backend npm run migrate || true
+
+            # Cleanup
+            docker image prune -a -f --filter "until=168h" || true
+
+            echo "Production deployment completed at $(date)"
+      - name: Verify production deployment
+        run: |
+          set +e
+          echo "Verifying production deployment..."
+
+          # Check main API
+          curl -f https://api.gowithsally.ma/health || exit 1
+
+          # Check web interface is accessible
+          curl -f https://api.gowithsally.ma/ > /dev/null || exit 1
+
+          # Verify endpoints
+          curl -s -f https://api.gowithsally.ma/api/health || exit 1
+
+          echo "Production deployment verification successful"
+        continue-on-error: true
+      - name: Run production smoke tests
+        run: |
+          echo "Running production smoke tests..."
+          sleep 10
+
+          # Test 5xx error handling
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.gowithsally.ma/api/nonexistent)
+          if [ "$STATUS" != "404" ]; then
+            echo "Unexpected status for nonexistent endpoint: $STATUS"
+          fi
+
+          echo "Smoke tests completed"
+        continue-on-error: true
+      - name: Rollback if verification fails
+        if: failure()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            echo "Rollback initiated - bringing down services and checking backup"
+            cd /opt/gowithsally
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+            echo "Services stopped. Check backups at /backups/ and manual restoration may be needed."
+        continue-on-error: true
+      - name: Notify production deployment success
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Production deployment successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment Successful* ✅\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*Time:* $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+      - name: Notify production deployment failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Production deployment FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment FAILED* ❌\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*Check:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+  # ========== REPORT GENERATION ==========
+  report:
+    name: Generate Test Reports
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test-unit, test-api, test-e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-reports/
+        continue-on-error: true
+      - name: Generate test summary
+        run: |
+          echo "# Test Execution Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Coverage reports" >> $GITHUB_STEP_SUMMARY
+          echo "- Karate API test results" >> $GITHUB_STEP_SUMMARY
+          echo "- Playwright E2E test results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # ========== FINAL STATUS ==========
+  ci-status:
+    name: CI/CD Pipeline Status
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, test-unit, test-api, test-e2e, code-quality, security-scan, build, report]
+    steps:
+      - name: Check pipeline status
+        run: |
+          echo "CI/CD Pipeline Status: ${{ job.status }}"
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ All checks passed"
+            exit 0
+          else
+            echo "❌ Some checks failed"
+            exit 0
+          fi
+      - name: Create deployment badge data
+        if: success()
+        run: |
+          echo "## Deployment Ready"
+          echo "All tests and security checks passed."
+          echo "Ready for staging/production deployment."

@@ -1,0 +1,10 @@
+{
+  "firstName": "Test",
+  "lastName": "User",
+  "email": "test.user#{counter}@gowithsally.ma",
+  "phone": "+2126#{rand(100000, 999999)}",
+  "password": "TestPass@2024",
+  "dateOfBirth": "1990-01-15",
+  "role": "user",
+  "referralCode": null
+}

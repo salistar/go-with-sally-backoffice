@@ -1,0 +1,461 @@
+---
+- name: Create application directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+  loop:
+    - "{{ app_dir }}"
+    - "{{ app_dir }}/src"
+    - "{{ app_dir }}/config"
+    - "{{ app_dir }}/logs"
+    - "{{ app_dir }}/uploads"
+    - "{{ app_dir }}/backups"
+
+- name: Clone application repository
+  git:
+    repo: "{{ app_repo | default('https://github.com/yourusername/gowithsally.git') }}"
+    dest: "{{ app_dir }}"
+    version: "{{ git_branch | default('main') }}"
+    accept_hostkey: yes
+  become_user: "{{ app_user }}"
+  register: git_clone
+
+- name: Create application environment configuration
+  copy:
+    content: |
+      # Environment Configuration
+      NODE_ENV={{ environment | default('staging') }}
+      APP_PORT={{ app_port | default(3000) }}
+      LOG_LEVEL=info
+
+      # Database Configuration
+      MONGODB_HOST={{ mongodb_host | default('gowithsally-db') }}
+      MONGODB_PORT={{ mongodb_port | default(27017) }}
+      MONGODB_DATABASE={{ mongodb_database | default('gowithsally') }}
+      MONGODB_USER={{ vault_mongodb_user }}
+      MONGODB_PASSWORD={{ vault_mongodb_password }}
+
+      # Redis Configuration
+      REDIS_HOST={{ redis_host | default('gowithsally-redis') }}
+      REDIS_PORT={{ redis_port | default(6379) }}
+      REDIS_PASSWORD={{ vault_redis_password }}
+
+      # JWT Configuration
+      JWT_SECRET={{ vault_jwt_secret }}
+      JWT_EXPIRATION=7d
+
+      # File Upload Configuration
+      UPLOAD_DIR=/home/{{ app_user }}/app/uploads
+      MAX_FILE_SIZE=104857600
+
+      # API Keys
+      SENDGRID_API_KEY={{ vault_sendgrid_api_key }}
+      STRIPE_PUBLIC_KEY={{ vault_stripe_public_key }}
+      STRIPE_SECRET_KEY={{ vault_stripe_secret_key }}
+      TWILIO_ACCOUNT_SID={{ vault_twilio_account_sid }}
+      TWILIO_AUTH_TOKEN={{ vault_twilio_auth_token }}
+
+      # AWS Configuration
+      AWS_REGION={{ aws_region | default('us-east-1') }}
+      AWS_ACCESS_KEY_ID={{ vault_aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY={{ vault_aws_secret_access_key }}
+      S3_BUCKET={{ s3_bucket | default('gowithsally-uploads') }}
+
+      # Logging
+      LOG_DIR=/home/{{ app_user }}/app/logs
+
+      # Feature Flags
+      FEATURE_USER_REGISTRATION=true
+      FEATURE_SOCIAL_AUTH=true
+      FEATURE_PAYMENTS=true
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0600'
+  no_log: yes
+
+- name: Install Node.js dependencies
+  shell: |
+    cd {{ app_dir }}
+    npm install --production
+  become_user: "{{ app_user }}"
+  register: npm_install
+  timeout: 600
+  environment:
+    NODE_ENV: "{{ environment | default('staging') }}"
+
+- name: Create docker-compose override file
+  copy:
+    content: |
+      version: '3.8'
+
+      services:
+        app:
+          image: gowithsally-app:latest
+          container_name: gowithsally-app
+          ports:
+            - "{{ app_port | default(3000) }}:3000"
+          environment:
+            - NODE_ENV={{ environment | default('staging') }}
+            - APP_PORT={{ app_port | default(3000) }}
+          volumes:
+            - {{ app_dir }}/uploads:/app/uploads
+            - {{ log_dir }}:/app/logs
+          networks:
+            - gowithsally-network
+          restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:{{ app_port | default(3000) }}/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+          logging:
+            driver: "json-file"
+            options:
+              max-size: "10m"
+              max-file: "3"
+          deploy:
+            resources:
+              limits:
+                cpus: '1'
+                memory: 1G
+              reservations:
+                cpus: '0.5'
+                memory: 512M
+
+        api:
+          image: gowithsally-api:latest
+          container_name: gowithsally-api
+          ports:
+            - "{{ api_port | default(3001) }}:3000"
+          environment:
+            - NODE_ENV={{ environment | default('staging') }}
+          networks:
+            - gowithsally-network
+          depends_on:
+            - db
+            - redis
+          restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+          deploy:
+            resources:
+              limits:
+                cpus: '1'
+                memory: 1G
+              reservations:
+                cpus: '0.5'
+                memory: 512M
+
+        db:
+          image: mongo:6.0
+          container_name: gowithsally-db
+          volumes:
+            - mongodb-data:/data/db
+          environment:
+            - MONGO_INITDB_ROOT_USERNAME={{ vault_mongodb_user }}
+            - MONGO_INITDB_ROOT_PASSWORD={{ vault_mongodb_password }}
+          networks:
+            - gowithsally-network
+          restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+          deploy:
+            resources:
+              limits:
+                cpus: '2'
+                memory: 2G
+              reservations:
+                cpus: '1'
+                memory: 1G
+
+        redis:
+          image: redis:7-alpine
+          container_name: gowithsally-redis
+          command: redis-server --requirepass {{ vault_redis_password }}
+          volumes:
+            - redis-data:/data
+          networks:
+            - gowithsally-network
+          restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+          deploy:
+            resources:
+              limits:
+                cpus: '1'
+                memory: 512M
+              reservations:
+                cpus: '0.25'
+                memory: 256M
+
+        nginx:
+          image: nginx:alpine
+          container_name: gowithsally-nginx
+          ports:
+            - "80:80"
+            - "443:443"
+          volumes:
+            - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - /etc/nginx/conf.d:/etc/nginx/conf.d:ro
+            - /etc/nginx/ssl:/etc/nginx/ssl:ro
+            - /var/www/gowithsally:/var/www/gowithsally:ro
+          networks:
+            - gowithsally-network
+          depends_on:
+            - app
+            - api
+          restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+          deploy:
+            resources:
+              limits:
+                cpus: '1'
+                memory: 512M
+              reservations:
+                cpus: '0.25'
+                memory: 256M
+
+      volumes:
+        mongodb-data:
+          driver: local
+        redis-data:
+          driver: local
+
+      networks:
+        gowithsally-network:
+          driver: bridge
+    dest: "{{ app_dir }}/docker-compose.override.yml"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0644'
+  no_log: yes
+
+- name: Build Docker images
+  shell: |
+    cd {{ app_dir }}
+    docker-compose build
+  register: docker_build
+  timeout: 1200
+
+- name: Run database migrations
+  shell: |
+    cd {{ app_dir }}
+    docker-compose run --rm api npm run migrate
+  register: migrations
+  timeout: 600
+  environment:
+    NODE_ENV: "{{ environment | default('staging') }}"
+
+- name: Create PM2 ecosystem configuration
+  copy:
+    content: |
+      module.exports = {
+        apps: [
+          {
+            name: 'gowithsally-app',
+            script: '{{ app_dir }}/app.js',
+            cwd: '{{ app_dir }}',
+            instances: 'max',
+            exec_mode: 'cluster',
+            env: {
+              NODE_ENV: '{{ environment | default("staging") }}',
+              APP_PORT: '{{ app_port | default(3000) }}'
+            },
+            error_file: '{{ log_dir }}/app-error.log',
+            out_file: '{{ log_dir }}/app-out.log',
+            merge_logs: true,
+            max_memory_restart: '1G',
+            watch: false,
+            ignore_watch: ['node_modules', 'uploads', 'logs'],
+            max_restarts: 10,
+            min_uptime: '10s',
+            autorestart: true,
+            kill_timeout: 5000
+          },
+          {
+            name: 'gowithsally-api',
+            script: '{{ app_dir }}/api/index.js',
+            cwd: '{{ app_dir }}',
+            instances: 'max',
+            exec_mode: 'cluster',
+            env: {
+              NODE_ENV: '{{ environment | default("staging") }}',
+              APP_PORT: '{{ api_port | default(3001) }}'
+            },
+            error_file: '{{ log_dir }}/api-error.log',
+            out_file: '{{ log_dir }}/api-out.log',
+            merge_logs: true,
+            max_memory_restart: '1G',
+            watch: false,
+            ignore_watch: ['node_modules', 'uploads', 'logs'],
+            max_restarts: 10,
+            min_uptime: '10s',
+            autorestart: true,
+            kill_timeout: 5000
+          }
+        ]
+      };
+    dest: "{{ app_dir }}/ecosystem.config.js"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0644'
+
+- name: Setup PM2 with systemd integration
+  shell: |
+    pm2 startup systemd -u {{ app_user }} --hp {{ app_home }} --no-daemon
+    pm2 start {{ app_dir }}/ecosystem.config.js
+    pm2 save
+  become_user: "{{ app_user }}"
+  environment:
+    HOME: "{{ app_home }}"
+
+- name: Create application health check script
+  copy:
+    content: |
+      #!/bin/bash
+      # Application Health Check
+
+      API_PORT={{ app_port | default(3000) }}
+      HEALTH_URL="http://localhost:$API_PORT/health"
+      MAX_RETRIES=5
+      RETRY_INTERVAL=5
+
+      echo "Checking application health at $HEALTH_URL..."
+
+      for i in $(seq 1 $MAX_RETRIES); do
+        if curl -sf $HEALTH_URL > /dev/null 2>&1; then
+          echo "✓ Application is healthy"
+          exit 0
+        fi
+        echo "Attempt $i/$MAX_RETRIES failed. Retrying in $RETRY_INTERVAL seconds..."
+        sleep $RETRY_INTERVAL
+      done
+
+      echo "✗ Application health check failed"
+      exit 1
+    dest: "{{ app_dir }}/health-check.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
+- name: Create cron job for log rotation
+  cron:
+    name: "Rotate application logs"
+    minute: "0"
+    hour: "*/6"
+    job: "cd {{ app_dir }} && find logs/ -name '*.log' -mtime +7 -delete"
+    user: "{{ app_user }}"
+
+- name: Create startup script
+  copy:
+    content: |
+      #!/bin/bash
+      # GoWithSally Application Startup Script
+
+      cd {{ app_dir }}
+
+      echo "Starting GoWithSally application..."
+      docker-compose up -d
+
+      # Wait for services to be ready
+      echo "Waiting for services to become healthy..."
+      sleep 10
+
+      # Run health checks
+      for service in app api db redis nginx; do
+        echo "Checking $service..."
+        docker ps --filter "name=$service" --filter "status=running" | grep -q $service
+        if [ $? -eq 0 ]; then
+          echo "✓ $service is running"
+        else
+          echo "✗ $service failed to start"
+          exit 1
+        fi
+      done
+
+      echo "✓ GoWithSally application started successfully"
+    dest: "{{ app_dir }}/start.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
+- name: Create stop script
+  copy:
+    content: |
+      #!/bin/bash
+      # GoWithSally Application Stop Script
+
+      cd {{ app_dir }}
+
+      echo "Stopping GoWithSally application..."
+      docker-compose stop -t 30
+
+      echo "✓ GoWithSally application stopped"
+    dest: "{{ app_dir }}/stop.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: '0755'
+
+- name: Create systemd service for application
+  copy:
+    content: |
+      [Unit]
+      Description=GoWithSally Application
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=forking
+      User={{ app_user }}
+      Group={{ app_group }}
+      WorkingDirectory={{ app_dir }}
+      ExecStart={{ app_dir }}/start.sh
+      ExecStop={{ app_dir }}/stop.sh
+      Restart=unless-stopped
+      RestartSec=10
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier=gowithsally-app
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/gowithsally-app.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable application service
+  systemd:
+    name: gowithsally-app
+    enabled: yes
+    daemon_reload: yes
+
+- name: Display application deployment summary
+  debug:
+    msg:
+      - "Application deployment completed"
+      - "Repository: {{ git_clone.repository }}"
+      - "Branch: {{ git_clone.version }}"
+      - "Application directory: {{ app_dir }}"
+      - "Environment: {{ environment | default('staging') }}"
+      - "Service status: enabled"

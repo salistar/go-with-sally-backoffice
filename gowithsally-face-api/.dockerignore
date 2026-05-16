@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Docs
+*.md
+!requirements.txt
+
+# Python cache
+__pycache__
+*.pyc
+.pytest_cache
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Models (mounted via volume, not baked)
+models/
+datasets/
+voice_gender/data/
+age_output/
+training/
+
+# Test files
+*.jpg
+*.png
+*.mp3
+*.wav
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose*.yml
+Dockerfile
+
+# Nginx config (copied separately in prod compose)
+nginx/

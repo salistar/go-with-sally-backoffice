@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+
+# Environment
+.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Uploads
+uploads/
+
+# Docker volumes
+mongodb_data/
+redis_data/
+
+# Build
+dist/
+build/
+*.pyc
+
+# Mobile
+.expo/
+android/
+ios/
+
+# Models (too large for git)
+gowithsally-face-api/models/
+!gowithsally-face-api/models/.gitkeep
+
+# Backups
+backups/
+*.gz
+*.tar.gz
+
+# SSL certs
+nginx/ssl/*.pem
+nginx/ssl/*.key
+
+# prod secrets (jamais committer)
+.env.production
+.env.*.local
+!.env.production.example
+!.env.production.example.bak
+
+# deploy workspace
+_gws_deploy/

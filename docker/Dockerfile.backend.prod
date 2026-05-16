@@ -1,0 +1,86 @@
+# Production Dockerfile for GoWithSally Backend
+# Optimized for Hetzner CX21 deployment
+# Multi-stage build for minimal final image size
+# Includes comprehensive logging setup
+
+# Stage 1: Dependencies
+FROM node:20-alpine as dependencies
+LABEL maintainer="GoWithSally Team"
+LABEL description="Production backend with optimized dependencies"
+
+WORKDIR /app
+
+# Copy package files
+COPY gowithsally-backend/package*.json ./
+
+# Install production dependencies only
+RUN npm ci --only=production && \
+    npm cache clean --force && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies installed successfully"
+
+# Stage 2: Builder - compile/validate
+FROM node:20-alpine as builder
+LABEL stage="builder"
+
+WORKDIR /app
+
+# Copy from dependencies stage
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# Copy source code
+COPY gowithsally-backend ./
+
+# Run linting and validation
+RUN npm run lint || true && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Linting completed"
+
+# Stage 3: Production Runtime
+FROM node:20-alpine as production
+LABEL maintainer="GoWithSally Team"
+LABEL version="1.0.0"
+LABEL environment="production"
+
+WORKDIR /app
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init curl && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] System dependencies installed"
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    mkdir -p /app/logs && \
+    chown -R nodejs:nodejs /app && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Application user created"
+
+# Copy node_modules from dependencies stage
+COPY --from=dependencies --chown=nodejs:nodejs /app/node_modules ./node_modules
+
+# Copy application code from builder stage
+COPY --from=builder --chown=nodejs:nodejs /app ./
+
+# Set environment variables
+ENV NODE_ENV=production \
+    PORT=3000 \
+    LOG_LEVEL=info \
+    NODE_OPTIONS="--max-old-space-size=512" \
+    NPM_CONFIG_LOGLEVEL=error
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
+EXPOSE 3000
+
+# Log startup
+RUN echo "[$(date '+%Y-%m-%d %H:%M:%S')] Production Dockerfile built successfully"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start application with logging
+CMD ["node", "server.js"]

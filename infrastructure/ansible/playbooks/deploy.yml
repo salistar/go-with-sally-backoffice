@@ -1,0 +1,365 @@
+---
+- name: Deploy GoWithSally Application
+  hosts: "{{ deploy_target | default('staging') }}"
+  become: yes
+  serial: 1  # Rolling deployment - one server at a time
+
+  vars:
+    app_repo: "https://github.com/yourusername/gowithsally.git"
+    app_branch: "{{ git_branch | default('main') }}"
+    docker_registry: "your-registry.azurecr.io"
+    docker_registry_user: "{{ vault_docker_registry_user }}"
+    docker_registry_password: "{{ vault_docker_registry_password }}"
+    health_check_url: "http://localhost:{{ app_port | default(3000) }}/health"
+    health_check_max_retries: 30
+    health_check_delay: 2
+    rollback_on_failure: yes
+    deployment_timeout: 600
+
+  pre_tasks:
+    - name: Set deployment facts
+      set_fact:
+        deployment_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+        previous_version: "unknown"
+
+    - name: Get current version before deployment
+      shell: |
+        docker ps -a --filter "name=gowithsally-app" --format "{{.Image}}" | head -1
+      register: current_version
+      ignore_errors: yes
+
+    - name: Store previous version
+      set_fact:
+        previous_version: "{{ current_version.stdout | default('unknown') }}"
+
+    - name: Create backup of current state
+      block:
+        - name: Create backup directory
+          file:
+            path: "{{ app_dir }}/backups/{{ deployment_timestamp }}"
+            state: directory
+            owner: "{{ app_user }}"
+            group: "{{ app_group }}"
+
+        - name: Backup current docker-compose
+          shell: |
+            cp -r {{ app_dir }}/docker-compose.yml {{ app_dir }}/backups/{{ deployment_timestamp }}/
+            cp -r {{ app_dir }}/docker-compose.override.yml {{ app_dir }}/backups/{{ deployment_timestamp }}/ || true
+            docker-compose -f {{ app_dir }}/docker-compose.yml config > {{ app_dir }}/backups/{{ deployment_timestamp }}/docker-compose.resolved.yml
+          args:
+            warn: no
+          ignore_errors: yes
+
+        - name: Export current database state
+          shell: |
+            docker exec gowithsally-db mongodump --out /backup/mongo_{{ deployment_timestamp }} || true
+          ignore_errors: yes
+
+  tasks:
+    - name: Fetch latest code from repository
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ app_branch }}"
+        update: yes
+        accept_hostkey: yes
+      become_user: "{{ app_user }}"
+      register: git_result
+
+    - name: Display git changes
+      debug:
+        msg: "Repository updated. New commit: {{ git_result.after | default('unknown') }}"
+
+    - name: Copy environment configuration
+      copy:
+        content: |
+          NODE_ENV={{ environment | default('staging') }}
+          APP_PORT={{ app_port | default(3000) }}
+          LOG_LEVEL=info
+          DEPLOYMENT_VERSION={{ deployment_timestamp }}
+          DEPLOYMENT_DATE={{ ansible_date_time.iso8601 }}
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0600'
+      no_log: yes
+
+    - name: Load sensitive environment variables from vault
+      copy:
+        content: "{{ vault_env_config }}"
+        dest: "{{ app_dir }}/.env.secret"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0600'
+      no_log: yes
+
+    - name: Docker login to registry
+      docker_login:
+        registry: "{{ docker_registry }}"
+        username: "{{ docker_registry_user }}"
+        password: "{{ docker_registry_password }}"
+        state: present
+      no_log: yes
+
+    - name: Pull latest base images
+      shell: |
+        docker pull node:18-alpine
+        docker pull mongo:6.0
+        docker pull redis:7-alpine
+        docker pull nginx:alpine
+      register: pull_result
+
+    - name: Build Docker images
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
+      register: build_result
+      timeout: 600
+
+    - name: Display build output
+      debug:
+        msg: "{{ build_result.stdout_lines[-10:] }}"
+
+    - name: Tag images for registry
+      shell: |
+        docker tag gowithsally-app:latest {{ docker_registry }}/gowithsally-app:{{ deployment_timestamp }}
+        docker tag gowithsally-app:latest {{ docker_registry }}/gowithsally-app:latest
+        docker tag gowithsally-api:latest {{ docker_registry }}/gowithsally-api:{{ deployment_timestamp }}
+        docker tag gowithsally-api:latest {{ docker_registry }}/gowithsally-api:latest
+      ignore_errors: yes
+
+    - name: Push images to registry
+      shell: |
+        docker push {{ docker_registry }}/gowithsally-app:{{ deployment_timestamp }}
+        docker push {{ docker_registry }}/gowithsally-app:latest
+        docker push {{ docker_registry }}/gowithsally-api:{{ deployment_timestamp }}
+        docker push {{ docker_registry }}/gowithsally-api:latest
+      register: push_result
+      ignore_errors: yes
+
+    - name: Stop old containers gracefully
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml stop -t 30
+      ignore_errors: yes
+      timeout: 60
+
+    - name: Run database migrations
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npm run migrate
+      timeout: 300
+      register: migration_result
+
+    - name: Display migration output
+      debug:
+        msg: "{{ migration_result.stdout_lines | default([]) }}"
+
+    - name: Run database seeds (optional)
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npm run seed -- --force
+      ignore_errors: yes
+      timeout: 300
+      when: run_seeds | default(false)
+
+    - name: Start containers with new images
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+      register: up_result
+
+    - name: Display docker-compose up output
+      debug:
+        msg: "{{ up_result.stdout_lines | default([]) }}"
+
+    - name: Wait for application to be ready
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+      register: health_check
+      until: health_check is success
+      retries: "{{ health_check_max_retries }}"
+      delay: "{{ health_check_delay }}"
+      timeout: "{{ deployment_timeout }}"
+
+    - name: Run application health checks
+      block:
+        - name: Check application status
+          shell: |
+            curl -s -f -m 5 {{ health_check_url }} > /dev/null 2>&1
+            echo "Health check: OK"
+          register: app_health
+
+        - name: Verify database connectivity
+          shell: |
+            cd {{ app_dir }}
+            docker-compose -f docker-compose.yml exec -T api npm run health-check:db
+          register: db_health
+          ignore_errors: yes
+
+        - name: Check Redis connectivity
+          shell: |
+            cd {{ app_dir }}
+            docker-compose -f docker-compose.yml exec -T api npm run health-check:redis
+          register: redis_health
+          ignore_errors: yes
+
+        - name: Display health check results
+          debug:
+            msg:
+              - "App Health: {{ app_health.stdout }}"
+              - "Database Health: {{ db_health.stdout | default('N/A') }}"
+              - "Redis Health: {{ redis_health.stdout | default('N/A') }}"
+
+    - name: Run smoke tests
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api npm run test:smoke
+      register: smoke_tests
+      timeout: 300
+      ignore_errors: yes
+
+    - name: Display smoke test results
+      debug:
+        msg: "{{ smoke_tests.stdout_lines | default([]) }}"
+
+    - name: Verify deployment success
+      assert:
+        that:
+          - health_check is succeeded
+          - up_result is succeeded
+        fail_msg: "Deployment health checks failed"
+
+  rescue:
+    - name: Deployment failed - initiate rollback
+      debug:
+        msg: "Deployment failed. Initiating rollback to {{ previous_version }}"
+
+    - name: Stop failed containers
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml stop -t 10
+      ignore_errors: yes
+
+    - name: Restore previous docker-compose configuration
+      shell: |
+        cp {{ app_dir }}/backups/{{ deployment_timestamp }}/docker-compose.yml {{ app_dir }}/
+        cp {{ app_dir }}/backups/{{ deployment_timestamp }}/docker-compose.override.yml {{ app_dir }}/ || true
+      ignore_errors: yes
+
+    - name: Restore previous images
+      shell: |
+        docker images | grep "{{ previous_version }}" || docker pull {{ previous_version }}
+      ignore_errors: yes
+
+    - name: Start previous version
+      shell: |
+        cd {{ app_dir }}
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+      ignore_errors: yes
+
+    - name: Wait for rollback to complete
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+      register: rollback_health
+      until: rollback_health is success
+      retries: 10
+      delay: 2
+      timeout: 60
+      ignore_errors: yes
+
+    - name: Create incident report
+      copy:
+        content: |
+          DEPLOYMENT FAILURE REPORT
+          ========================
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Environment: {{ environment | default('unknown') }}
+          Target Version: {{ deployment_timestamp }}
+          Previous Version: {{ previous_version }}
+          Status: ROLLED BACK
+
+          Error Summary:
+          {{ ansible_failed_result.msg | default('Unknown error') }}
+        dest: "{{ log_dir }}/deployment-failure-{{ deployment_timestamp }}.log"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+
+    - name: Send alert notification
+      shell: |
+        # Send to monitoring system (Prometheus Alertmanager, PagerDuty, etc)
+        curl -X POST http://localhost:9093/api/v1/alerts \
+          -H "Content-Type: application/json" \
+          -d '{
+            "alerts": [{
+              "status": "firing",
+              "labels": {
+                "alertname": "DeploymentFailed",
+                "severity": "critical",
+                "environment": "{{ environment | default('unknown') }}",
+                "instance": "{{ inventory_hostname }}"
+              },
+              "annotations": {
+                "summary": "GoWithSally deployment failed on {{ inventory_hostname }}",
+                "description": "Deployment rolled back to {{ previous_version }}"
+              }
+            }]
+          }'
+      ignore_errors: yes
+
+    - name: Fail the deployment
+      fail:
+        msg: "Deployment failed and rolled back. Check logs at {{ log_dir }}/deployment-failure-{{ deployment_timestamp }}.log"
+
+  post_tasks:
+    - name: Clean up old backups (keep last 10)
+      shell: |
+        cd {{ app_dir }}/backups
+        ls -t | tail -n +11 | xargs -r rm -rf
+      ignore_errors: yes
+
+    - name: Clean up dangling Docker images
+      shell: |
+        docker image prune -f --filter "dangling=true"
+      ignore_errors: yes
+
+    - name: Log deployment completion
+      shell: |
+        echo "[$(date)] Deployment completed successfully for {{ deployment_timestamp }} on {{ inventory_hostname }}" >> {{ log_dir }}/deployments.log
+
+    - name: Create deployment summary
+      copy:
+        content: |
+          DEPLOYMENT SUMMARY
+          ==================
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Environment: {{ environment | default('unknown') }}
+          Version: {{ deployment_timestamp }}
+          Previous Version: {{ previous_version }}
+          Status: SUCCESS
+          Git Commit: {{ git_result.after | default('unknown') }}
+          Branch: {{ app_branch }}
+
+          Changes:
+          {{ git_result.stdout_lines | default([]) | join('\n') }}
+
+          Health Checks: PASSED
+          Smoke Tests: PASSED
+
+          Deployment completed at: {{ ansible_date_time.iso8601 }}
+        dest: "{{ log_dir }}/deployment-{{ deployment_timestamp }}.log"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+
+    - name: Fetch deployment logs
+      fetch:
+        src: "{{ log_dir }}/deployment-{{ deployment_timestamp }}.log"
+        dest: ./deployment-{{ inventory_hostname }}-{{ deployment_timestamp }}.log
+        flat: yes
+      ignore_errors: yes

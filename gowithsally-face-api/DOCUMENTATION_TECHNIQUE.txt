@@ -1,0 +1,469 @@
+================================================================================
+   DOCUMENTATION TECHNIQUE - GoWithSally Face API v4.1
+   Date: 20 Mars 2026
+   Auteur: Idriss + Claude AI
+================================================================================
+
+TABLE DES MATIERES
+==================
+1. Vue d'ensemble du projet
+2. Architecture technique
+3. Les 13 modeles IA
+4. Historique des corrections effectuees
+5. Commandes Docker utilisees
+6. Endpoints API (27 routes)
+7. Configuration et variables d'environnement
+8. Guide de deploiement
+9. Troubleshooting
+
+================================================================================
+1. VUE D'ENSEMBLE DU PROJET
+================================================================================
+
+GoWithSally Face API est une API REST de reconnaissance faciale et d'analyse
+biometrique construite avec FastAPI (Python 3.11). Elle utilise 13 modeles IA
+pour la detection de visages, la reconnaissance, l'estimation d'age, la
+classification de genre, la detection anti-spoof, l'analyse vocale et le
+comptage de personnes.
+
+Stack technique:
+- Backend: FastAPI + Uvicorn (dev) / Gunicorn (prod)
+- ML Frameworks: dlib, PyTorch, TensorFlow 2.15, TFLite, YOLOv8, sklearn
+- Cache: Redis 7 (rate limiting + cache embeddings)
+- Container: Docker + Docker Compose
+- Monitoring: Prometheus + Grafana (prod)
+- Load Balancer: Nginx (prod)
+
+================================================================================
+2. ARCHITECTURE TECHNIQUE
+================================================================================
+
+Structure des fichiers:
+-----------------------
+gowithsally-face-api/
+|-- app/
+|   |-- main.py                  # Application principale (90KB, 27 endpoints)
+|   |-- __init__.py
+|   |-- routes/
+|   |   |-- unified_pipeline.py  # Pipeline d'analyse unifiee
+|   |   |-- verify_voice.py      # Verification vocale
+|   |-- services/
+|       |-- face_count.py        # Comptage YOLO
+|       |-- preprocessing.py     # Preprocessing images
+|       |-- voice_analysis.py    # Extraction features audio
+|
+|-- models/
+|   |-- face/                    # Modeles detection + reconnaissance
+|   |-- gender/                  # Modeles genre (PyTorch + TF)
+|   |-- antispoof/               # Modeles anti-spoof (PyTorch + TF)
+|   |-- age/                     # Modele age (TFLite + Keras)
+|   |-- voice_gender/            # Modele genre vocal (sklearn)
+|   |-- facecount/               # YOLOv8 face count
+|   |-- headcount/               # YOLOv8 head count
+|
+|-- templates/
+|   |-- index.html               # Page d'accueil
+|   |-- login.html               # Page de login
+|   |-- studio.html              # Studio de test IA
+|
+|-- static/                      # Fichiers statiques (CSS, JS, images)
+|-- test/                        # Dossier de tests fonctionnels
+|-- scripts/                     # Scripts utilitaires
+|-- docker-compose.yml           # Config Docker dev
+|-- docker-compose.prod.yml      # Config Docker prod
+|-- Dockerfile                   # Image Docker
+|-- requirements.txt             # Dependances Python
+
+Docker Compose (developpement):
+-------------------------------
+Services:
+  face-api (gws-face-api):
+    - Image: python:3.11-slim
+    - Port: 8000
+    - Memoire: 4GB max, 512MB reserve
+    - Volumes montes:
+      * ./models:/app/models:ro     (modeles en lecture seule)
+      * ./app:/app/app:ro           (code en lecture seule, hot-reload)
+      * ./templates:/app/templates  (templates HTML)
+      * ./static:/app/static        (fichiers statiques)
+    - Variables: APP_ENV=development, TF_USE_LEGACY_KERAS=1
+    - Healthcheck: GET /api/health/ping toutes les 30s
+
+  redis (gws-redis):
+    - Image: redis:7-alpine
+    - Port: 6379
+    - Memoire max: 128MB (eviction LRU)
+    - Healthcheck: redis-cli ping
+
+Reseau: sally-net (bridge)
+
+================================================================================
+3. LES 13 MODELES IA
+================================================================================
+
+#  | Nom                  | Framework    | Fichier                              | Taille  | Fonction
+---|----------------------|--------------|--------------------------------------|---------|-----------------------------------
+1  | Face Detector        | dlib         | (HOG integre a dlib)                 | ~10MB   | Detection de visages dans l'image
+2  | 68 Landmarks         | dlib         | shape_predictor_68_face_landmarks.dat| ~95MB   | 68 points du visage (yeux, nez, bouche)
+3  | Recognition dlib     | dlib         | dlib_face_recognition_resnet_model_v1| ~22MB   | Embedding facial 128D
+4  | Recognition TF       | TensorFlow   | face_recognition_model_v2.weights.h5 | ~270MB  | Embedding facial 128D (ResNet50)
+5  | Gender PyTorch       | PyTorch      | gender_model_v3.pth                  | ~45MB   | Classification homme/femme (ResNet18)
+6  | Gender TF            | TensorFlow   | gender_model_v3.h5                   | ~45MB   | Classification homme/femme (TF)
+7  | Anti-Spoof PyTorch   | PyTorch      | antispoof_model_v3.pth               | ~10MB   | Detection spoof (MobileNetV2)
+8  | Anti-Spoof TF        | TensorFlow   | antispoof_model_v4.h5                | ~10MB   | Detection spoof (TF)
+9  | Voice Gender         | sklearn      | best_model.pkl + scaler/encoder      | ~5MB    | Genre par la voix (XGBoost ensemble)
+10 | Age TFLite           | TFLite       | age_model_v4.tflite                  | 23.5MB  | Estimation d'age (EfficientNetV2-S)
+11 | Age Keras            | TensorFlow   | age_model_v4.keras                   | 270MB   | Estimation d'age (backup, lourd)
+12 | Face Count YOLO      | YOLOv8       | yolo_face_best.pt                    | ~6MB    | Comptage de visages
+13 | Head Count YOLO      | YOLOv8       | yolo_head_best.pt                    | ~6MB    | Comptage de tetes
+
+Chargement des modeles:
+- Les modeles se chargent en background au demarrage (thread separe)
+- Ordre: dlib (rapide) -> PyTorch -> sklearn -> TensorFlow -> TFLite -> YOLO
+- Le modele Age TFLite (23.5MB) remplace le Age Keras (270MB) pour le chargement rapide
+- Temps de chargement total: ~2-3 minutes
+- Le studio affiche le compteur en temps reel (X/13)
+
+================================================================================
+4. HISTORIQUE DES CORRECTIONS EFFECTUEES
+================================================================================
+
+PROBLEME 1: Compteur de modeles dans le studio (studio.html)
+-------------------------------------------------------------
+Symptome: Le compteur affichait "0/0 modeles" ou erreur JavaScript
+Cause: Le code cherchait `data.models.filter(m => m.loaded)` (un tableau)
+       alors que l'API /api/test retourne `data.models_count` (nombre)
+       et `data.models_loaded` (objet {cle: true/false})
+Solution: Remplace par `data.models_count` pour le nombre charge
+          et hardcode `13` comme total attendu
+Fichier modifie: templates/studio.html (ligne ~966)
+
+PROBLEME 2: Recognition TF - fichier weights-only
+--------------------------------------------------
+Symptome: [SKIP] Recognition TF: No model config found in the file
+Cause: face_recognition_model_v2.weights.h5 est un fichier de POIDS seulement
+       (pas un modele complet avec architecture). tf.keras.models.load_model()
+       ne peut pas le charger directement.
+Solution: Reconstruction manuelle de l'architecture ResNet50 + Dense head
+          (2048->512->256->128) puis load_weights(by_name=True, skip_mismatch=True)
+Fichier modifie: app/main.py (fonction _load_recog_tf)
+
+PROBLEME 3: Gender TF - incompatibilite Keras 2/3
+--------------------------------------------------
+Symptome: [SKIP] Gender TF: Layer "dense" expects 1 input(s), but received 2
+Cause: Le modele gender_model_v3.h5 a ete sauvegarde avec TF 2.16 (Keras 3)
+       mais charge avec TF 2.16 Keras 3 qui a change le format des layers Dense
+Solution: Installation de TF 2.15 (Keras 2 natif) + tf_keras + compile=False
+          avec 3 strategies de fallback dans _try_load_keras()
+Fichier modifie: app/main.py, requirements.txt
+
+PROBLEME 4: AntiSpoof TF - erreur Flatten
+------------------------------------------
+Symptome: [SKIP] AntiSpoof TF: Exception encountered when calling Flatten.call()
+Cause: Meme incompatibilite Keras 2/3
+Solution: Meme fix que Gender TF (TF 2.15 + compile=False)
+Fichier modifie: app/main.py
+
+PROBLEME 5: Age Keras v4 - deserialization Functional
+------------------------------------------------------
+Symptome: [FAIL] Age Keras: Could not deserialize class 'Functional' because
+          its parent module keras.src.engine.functional cannot be imported
+Cause: Le modele age_model_v4.keras a ete sauvegarde avec Keras 3 (format .keras)
+       mais TF 2.15 utilise Keras 2 qui ne connait pas ce format
+Solution en 2 etapes:
+  a) Conversion du modele en TFLite (23.5MB vs 270MB original)
+     - Extraction du ZIP .keras (contient config.json + model.weights.h5)
+     - Reconstruction de l'architecture via model_from_json()
+     - Conversion TFLite avec quantization DEFAULT
+  b) Ajout d'un chargeur TFLite dans main.py qui charge en ~2 secondes
+Fichiers modifies: app/main.py, scripts/convert_age_tflite.py
+
+PROBLEME 6: Age Keras bloquait le thread pendant 35+ minutes
+-------------------------------------------------------------
+Symptome: Le modele Age (270MB) prenait 35+ minutes a charger, bloquant
+          les YOLO et tous les autres modeles en attente
+Cause: EfficientNetV2-S avec 270MB de poids, charge en CPU dans Docker
+Solution:
+  a) Ajout d'un timeout de 120 secondes avec concurrent.futures.ThreadPoolExecutor
+  b) Priorite au TFLite (23.5MB, charge en 2 secondes)
+  c) Keras 270MB garde en backup si TFLite absent
+Fichier modifie: app/main.py
+
+PROBLEME 7: Docker build cache - requirements.txt pas pris en compte
+---------------------------------------------------------------------
+Symptome: `docker compose up -d --build` affichait tout CACHED meme apres
+          modification du requirements.txt
+Cause: Docker cache les layers. COPY requirements.txt n'a pas change le hash
+       car le fichier etait le meme dans le cache de l'image
+Solution: `docker compose build --no-cache face-api` pour forcer le rebuild complet
+Commande: docker compose build --no-cache face-api (~30 min)
+
+RESUME DES MODIFICATIONS:
+  requirements.txt: Ajout tensorflow-cpu<2.16.0, tf_keras
+  docker-compose.yml: Ajout TF_USE_LEGACY_KERAS=1, TF_ENABLE_ONEDNN_OPTS=0
+  app/main.py: _try_load_keras(), _load_recog_tf() ResNet50, Age TFLite loader
+  templates/studio.html: Compteur modeles corrige
+  scripts/convert_age_tflite.py: Script de conversion Keras->TFLite
+
+================================================================================
+5. COMMANDES DOCKER UTILISEES
+================================================================================
+
+--- COMMANDES DE BASE ---
+
+# Demarrer tous les services
+docker compose up -d
+
+# Demarrer uniquement face-api
+docker compose up -d face-api
+
+# Arreter tous les services
+docker compose down
+
+# Arreter un service specifique
+docker compose down face-api
+
+# Redemarrer (sans rebuild)
+docker compose restart face-api
+
+# Rebuild + demarrer (utilise le cache Docker)
+docker compose up -d --build face-api
+
+# Rebuild SANS cache (force reinstallation de tout)
+docker compose build --no-cache face-api
+docker compose up -d face-api
+
+--- COMMANDES DE DIAGNOSTIC ---
+
+# Voir les logs en temps reel
+docker logs -f gws-face-api
+
+# Voir les 30 dernières lignes
+docker logs gws-face-api --tail 30
+
+# Voir les logs des 5 dernières minutes
+docker logs gws-face-api --since 5m
+
+# Filtrer les logs (Windows PowerShell)
+docker logs gws-face-api --since 5m 2>&1 | findstr "OK FAIL SKIP ALL"
+
+# Filtrer les logs (Linux/Mac)
+docker logs gws-face-api --since 5m 2>&1 | grep -E "OK|FAIL|SKIP|ALL"
+
+# Executer une commande dans le container
+docker exec gws-face-api <commande>
+
+# Verifier si une fonction existe dans le code
+docker exec gws-face-api grep "_try_load_keras" /app/app/main.py
+
+# Tester l'API directement depuis le container
+docker exec gws-face-api curl -s http://localhost:8000/api/test
+
+# Copier un fichier dans le container
+docker cp fichier.py gws-face-api:/tmp/fichier.py
+
+# Copier un fichier depuis le container
+docker cp gws-face-api:/tmp/fichier.tflite ./models/age/
+
+# Voir la memoire/CPU utilises
+docker stats gws-face-api --no-stream
+
+# Voir les volumes montes
+docker inspect gws-face-api --format='{{json .Mounts}}'
+
+--- COMMANDES DE CONVERSION TFLITE ---
+
+# Copier le script de conversion
+docker cp scripts/convert_age_tflite.py gws-face-api:/tmp/convert_age_tflite.py
+
+# Lancer la conversion
+docker exec -e TF_CPP_MIN_LOG_LEVEL=2 -e TF_USE_LEGACY_KERAS=1 gws-face-api python /tmp/convert_age_tflite.py
+
+# Recuperer le fichier converti
+docker cp gws-face-api:/tmp/age_model_v4.tflite ./models/age/age_model_v4.tflite
+
+--- COMMANDES PRODUCTION ---
+
+# Deployer en production (avec nginx, prometheus, grafana)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Voir les replicas
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+================================================================================
+6. ENDPOINTS API (27 ROUTES)
+================================================================================
+
+Authentification: Header "X-API-Key: <cle>" ou query param "?key=<cle>"
+Obtenir une cle: POST /api/auth/login avec {"password": "sally2024"}
+Base URL: http://localhost:8000
+
+--- PAGES WEB (GET, sans auth) ---
+GET /              -> Page d'accueil
+GET /login         -> Page de login
+GET /studio        -> Studio de test IA interactif
+
+--- SANTE (GET, sans auth) ---
+GET /api/health/ping   -> {"status": "ok"} (pour load balancer)
+GET /api/test          -> Diagnostic complet (modeles, version, erreurs)
+
+--- SANTE (GET, avec auth) ---
+GET /api/health        -> Sante complete avec details modeles
+
+--- DETECTION & RECONNAISSANCE (POST, avec auth) ---
+
+POST /api/detect
+  Body: form-data avec "file" (image JPG/PNG)
+  Retour: {faces: [{bbox, landmarks, confidence}], count, processing_time}
+
+POST /api/recognize
+  Body: form-data avec "file" (image)
+  Retour: {faces: [{embedding_128d, bbox}], count}
+
+POST /api/compare
+  Body: form-data avec "file1" + "file2" (2 images)
+  Retour: {match, distance, threshold, confidence}
+  Seuils: strict=0.45, normal=0.55
+
+--- CLASSIFICATION (POST, avec auth) ---
+
+POST /api/gender
+  Body: form-data avec "file" (image)
+  Retour: {gender: "male"|"female", confidence, model_used}
+
+POST /api/age
+  Body: form-data avec "file" (image)
+  Retour: {age, confidence, model_used: "tflite"|"keras"|"landmarks_fallback"}
+
+POST /api/antispoof
+  Body: form-data avec "file" (image)
+  Retour: {is_real: true|false, confidence, score}
+
+POST /api/voice-gender
+  Body: form-data avec "file" (audio MP3/WAV)
+  Retour: {gender: "male"|"female", confidence}
+
+--- COMPTAGE (POST, avec auth) ---
+
+POST /api/count-faces
+  Body: form-data avec "file" (image)
+  Retour: {count, detections: [{bbox, confidence}]}
+
+POST /api/detect-heads
+  Body: form-data avec "file" (image)
+  Retour: {count, detections: [{bbox, confidence}]}
+
+--- ANALYSE UNIFIEE (POST, avec auth) ---
+
+POST /api/analyze
+  Body: form-data avec "file" (image)
+  Retour: {faces: [{gender, age, is_real, bbox, landmarks, embedding}],
+           face_count, head_count, processing_time}
+
+--- VERIFICATION GOWITHSALLY (POST, avec auth) ---
+
+POST /api/driver-verify
+  Body: form-data avec "file1" (photo profil) + "file2" (photo live)
+  Retour: {match, is_real, age_ok (>18), overall_pass, details}
+
+POST /api/passenger-verify
+  Body: form-data avec "file" (photo live)
+  Retour: {faces_detected, occupant_count, is_real, details}
+
+POST /api/trip-safety
+  Body: form-data avec "file" (photo)
+  Retour: {safety_score (0-100), factors: {liveness, face_detected, head_count}}
+
+--- IA EXTERNE (POST, avec auth, fallback Gemini/OpenAI/etc.) ---
+
+POST /api/ai/gender     -> Genre avec fallback IA externe
+POST /api/ai/age        -> Age avec fallback IA externe
+POST /api/ai/analyze    -> Analyse complete avec IA comblant les lacunes
+POST /api/ai/describe   -> Description detaillee du visage (IA externe only)
+POST /api/ai/verify     -> Verification croisee interne vs externe
+POST /api/ai/emotion    -> Detection d'emotion (IA externe only)
+POST /api/ai/ethnicity  -> Estimation ethnicite (IA externe only)
+
+--- CONFIGURATION (GET, avec auth) ---
+GET /api/config/ai-providers -> Liste des providers IA configures
+
+================================================================================
+7. CONFIGURATION ET VARIABLES D'ENVIRONNEMENT
+================================================================================
+
+Variable                  | Defaut          | Description
+--------------------------|-----------------|------------------------------------
+APP_PASSWORD              | sally2024       | Mot de passe pour login
+SECRET_KEY                | dev-secret      | Cle JWT pour tokens
+APP_ENV                   | development     | development ou production
+REDIS_URL                 | redis://redis   | URL du serveur Redis
+CONF_HIGH                 | 0.8             | Seuil confiance haute
+CONF_LOW                  | 0.5             | Seuil confiance basse
+MATCH_STRICT              | 0.45            | Seuil match strict
+MATCH_NORMAL              | 0.55            | Seuil match normal
+TF_USE_LEGACY_KERAS       | 1               | Force Keras 2 avec TF 2.15
+TF_ENABLE_ONEDNN_OPTS     | 0               | Desactive oneDNN (evite warnings)
+TF_CPP_MIN_LOG_LEVEL      | 2               | Reduit les logs TF
+GEMINI_API_KEY            | (vide)          | Cle API Google Gemini
+OPENAI_API_KEY            | (vide)          | Cle API OpenAI
+ANTHROPIC_API_KEY         | (vide)          | Cle API Anthropic
+DEEPSEEK_API_KEY          | (vide)          | Cle API DeepSeek
+MISTRAL_API_KEY           | (vide)          | Cle API Mistral
+KIMI_API_KEY              | (vide)          | Cle API Kimi
+
+================================================================================
+8. GUIDE DE DEPLOIEMENT
+================================================================================
+
+--- Developpement ---
+1. cd gowithsally-face-api
+2. docker compose up -d
+3. Attendre ~2-3 min (chargement des 13 modeles)
+4. Ouvrir http://localhost:8000/studio
+5. Verifier: docker exec gws-face-api curl -s http://localhost:8000/api/test
+
+--- Production ---
+1. cd gowithsally-face-api
+2. Configurer les variables dans .env ou docker-compose.prod.yml
+3. docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+4. Nginx sur ports 80/443, Prometheus sur 9090, Grafana sur 3000
+5. 2 replicas API avec gunicorn
+
+--- Mise a jour du code ---
+Si le code est monte en volume (dev):
+  docker compose restart face-api
+
+Si le code est dans l'image (prod):
+  docker compose build --no-cache face-api
+  docker compose up -d face-api
+
+================================================================================
+9. TROUBLESHOOTING
+================================================================================
+
+Probleme: "0 modeles charges" dans le studio
+Solution: Verifier /api/test, le compteur utilise models_count pas models.filter
+
+Probleme: Modele X en [SKIP] ou [FAIL]
+Solution: Verifier la version TF (doit etre 2.15.x avec tf_keras)
+  docker exec gws-face-api python -c "import tensorflow as tf; print(tf.__version__)"
+
+Probleme: Age model trop long a charger
+Solution: Utiliser le TFLite (23.5MB) au lieu du Keras (270MB)
+  Verifier que age_model_v4.tflite existe dans models/age/
+
+Probleme: Build Docker tout CACHED malgre changements
+Solution: docker compose build --no-cache face-api
+
+Probleme: Container OOM (Out of Memory)
+Solution: Augmenter mem_limit dans docker-compose.yml (defaut: 4GB)
+
+Probleme: TF warnings "cuDNN factory already registered"
+Solution: Normal en mode CPU-only, ignorer (pas d'impact)
+
+Probleme: Redis connection refused
+Solution: Verifier que redis est started: docker compose up -d redis
+
+================================================================================
+FIN DE LA DOCUMENTATION
+================================================================================

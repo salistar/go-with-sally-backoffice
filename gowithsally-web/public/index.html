@@ -1,0 +1,2525 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Go With Sally - Morocco's first female-only ridesharing platform">
+    <meta property="og:title" content="Go With Sally - Travel Safe">
+    <meta property="og:description" content="Female-only ridesharing platform with verified drivers">
+    <title data-i18n="page_title">Go With Sally - Travel Safe</title>
+
+    <!-- API Configuration (override in production via Nginx sub_filter or Docker env) -->
+    <meta name="api-base-url" content="http://localhost:5000/api">
+    <meta name="socket-url" content="http://localhost:5000">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome 6.5 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <!-- Axios for API calls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+
+    <!-- Leaflet -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+    <style>
+        /* ==================== RESET & VARIABLES ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --rose-gold: #B76E79;
+            --deep-pink: #FF1493;
+            --light-pink: #FF69B4;
+            --champagne: #F7E7CE;
+            --cream-white: #FBF9F6;
+            --soft-gold: #D4AF37;
+            --dark-bg: #1a1419;
+            --dark-card: #2a2429;
+            --dark-elegance: #0f0d12;
+            --text-light: #E8E4DF;
+            --text-muted: #A89E98;
+            --border-color: rgba(215, 175, 55, 0.15);
+            --transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        body[data-theme="light"] {
+            --dark-bg: #f8f7f5;
+            --dark-card: #ffffff;
+            --dark-elegance: #fafaf9;
+            --text-light: #1a1419;
+            --text-muted: #6b6560;
+            --border-color: rgba(183, 110, 121, 0.15);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--dark-elegance);
+            color: var(--text-light);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+            text-align: right;
+        }
+
+        body[dir="ltr"] {
+            direction: ltr;
+            text-align: left;
+        }
+
+        /* ==================== LUXURY BACKGROUND ==================== */
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse 800px 600px at 20% 30%, rgba(183, 110, 121, 0.12) 0%, transparent 50%),
+                radial-gradient(ellipse 600px 500px at 80% 70%, rgba(255, 20, 147, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 500px 400px at 50% 50%, rgba(212, 175, 55, 0.06) 0%, transparent 50%),
+                var(--dark-elegance);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body[data-theme="light"] .bg-gradient {
+            background:
+                radial-gradient(ellipse 800px 600px at 20% 30%, rgba(183, 110, 121, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse 600px 500px at 80% 70%, rgba(255, 20, 147, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse 500px 400px at 50% 50%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
+                var(--dark-elegance);
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ==================== NAVIGATION ==================== */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 60px;
+            backdrop-filter: blur(20px);
+            background: rgba(15, 13, 18, 0.92);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        body[data-theme="light"] nav {
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        nav[dir="rtl"] {
+            flex-direction: row-reverse;
+        }
+
+        .nav-container {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        nav[dir="rtl"] .nav-container {
+            flex-direction: row-reverse;
+        }
+
+        .logo {
+            font-family: 'Playfair Display', serif;
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+            transition: var(--transition);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 36px;
+            align-items: center;
+            list-style: none;
+        }
+
+        nav[dir="rtl"] .nav-links {
+            flex-direction: row-reverse;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--soft-gold), var(--rose-gold));
+            transition: width 0.3s ease;
+        }
+
+        nav[dir="ltr"] .nav-links a::after {
+            left: 0;
+        }
+
+        nav[dir="rtl"] .nav-links a::after {
+            right: 0;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-light);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        nav[dir="rtl"] .nav-controls {
+            flex-direction: row-reverse;
+        }
+
+        .language-switcher {
+            display: flex;
+            gap: 8px;
+            background: rgba(212, 175, 55, 0.1);
+            padding: 6px 8px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .lang-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 16px;
+            transition: var(--transition);
+        }
+
+        .lang-btn.active {
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--soft-gold);
+        }
+
+        .lang-btn:hover {
+            color: var(--soft-gold);
+        }
+
+        .theme-toggle {
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            color: var(--soft-gold);
+            background: rgba(212, 175, 55, 0.2);
+        }
+
+        .btn-admin {
+            background: linear-gradient(135deg, var(--rose-gold), var(--deep-pink));
+            color: white;
+            padding: 10px 22px;
+            border: none;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-admin:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(183, 110, 121, 0.3);
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold));
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: var(--transition);
+        }
+
+        .user-avatar:hover {
+            transform: scale(1.1);
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--dark-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 0;
+            min-width: 200px;
+            display: none;
+            margin-top: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .user-dropdown.active {
+            display: block;
+        }
+
+        .user-dropdown a {
+            display: block;
+            padding: 10px 20px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .user-dropdown a:hover {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--soft-gold);
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* ==================== HERO SECTION ==================== */
+        .hero {
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            max-width: 900px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(48px, 7vw, 80px);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            letter-spacing: -1px;
+            color: var(--text-light);
+        }
+
+        .hero h1 .highlight {
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold), var(--deep-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 48px;
+            line-height: 1.8;
+            font-weight: 300;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold));
+            color: white;
+            padding: 16px 44px;
+            border: none;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 40px rgba(183, 110, 121, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--soft-gold);
+            padding: 16px 44px;
+            border: 2px solid var(--soft-gold);
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(212, 175, 55, 0.1);
+            transform: translateY(-4px);
+        }
+
+        /* ==================== STATS SECTION ==================== */
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 80px;
+            padding-bottom: 40px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 30px;
+            background: rgba(42, 36, 41, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--soft-gold);
+            background: rgba(212, 175, 55, 0.08);
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ==================== FEATURES SECTION ==================== */
+        .features-section {
+            padding: 120px 60px;
+            background: rgba(42, 36, 41, 0.3);
+            margin-top: 60px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .section-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(36px, 5vw, 56px);
+            font-weight: 800;
+            margin-bottom: 16px;
+            color: var(--text-light);
+        }
+
+        .section-header p {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            padding: 40px;
+            background: rgba(42, 36, 41, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            transition: var(--transition);
+            text-align: center;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-12px);
+            border-color: var(--soft-gold);
+            background: rgba(183, 110, 121, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            color: var(--soft-gold);
+            margin-bottom: 20px;
+            transition: var(--transition);
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+
+        .feature-card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-light);
+        }
+
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        /* ==================== ADMIN DASHBOARD ==================== */
+        .admin-container {
+            display: none;
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .admin-container.active {
+            display: block;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .admin-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 36px;
+            color: var(--text-light);
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .admin-tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .admin-tab.active {
+            color: var(--soft-gold);
+            border-bottom-color: var(--soft-gold);
+        }
+
+        .admin-tab:hover {
+            color: var(--text-light);
+        }
+
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .dashboard-card {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(183, 110, 121, 0.05));
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            transition: var(--transition);
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--soft-gold);
+        }
+
+        .card-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--soft-gold);
+            margin-bottom: 8px;
+        }
+
+        .card-change {
+            font-size: 12px;
+            color: #4ade80;
+        }
+
+        .card-change.negative {
+            color: #ef4444;
+        }
+
+        /* ==================== TABLES ==================== */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table thead {
+            background: rgba(212, 175, 55, 0.08);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .data-table th {
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--soft-gold);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .data-table td {
+            padding: 16px;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .status-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .status-pending {
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--soft-gold);
+        }
+
+        /* ==================== CHARTS ==================== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .chart-container {
+            background: rgba(42, 36, 41, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        #revenueChart, #usersChart, #driversChart, #ridesChart {
+            max-height: 300px;
+        }
+
+        /* ==================== MAP ==================== */
+        #rideMap {
+            width: 100%;
+            height: 500px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            margin-top: 20px;
+        }
+
+        /* ==================== LOGIN FORM ==================== */
+        .login-container {
+            display: none;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container.active {
+            display: flex;
+        }
+
+        .login-form {
+            background: rgba(42, 36, 41, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 60px;
+            max-width: 420px;
+            width: 100%;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .login-form h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 36px;
+            margin-bottom: 12px;
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        .login-form p {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(232, 228, 223, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-light);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--soft-gold);
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--soft-gold), var(--rose-gold));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(183, 110, 121, 0.3);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* ==================== SECTIONS VISIBILITY ==================== */
+        .landing-section {
+            display: none;
+        }
+
+        .landing-section.active {
+            display: block;
+        }
+
+        /* ==================== FOOTER ==================== */
+        footer {
+            background: rgba(15, 13, 18, 0.95);
+            border-top: 1px solid var(--border-color);
+            padding: 60px;
+            margin-top: 100px;
+        }
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .footer-column h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--soft-gold);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .footer-column a {
+            display: block;
+            padding: 8px 0;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .footer-column a:hover {
+            color: var(--soft-gold);
+            transform: translateX(4px);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* ==================== ANIMATIONS ==================== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .scroll-animate {
+            opacity: 0;
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        .scroll-animate.active {
+            animation-play-state: running;
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 1024px) {
+            nav {
+                padding: 16px 30px;
+            }
+
+            .hero {
+                padding: 60px 30px;
+            }
+
+            .features-section {
+                padding: 80px 30px;
+            }
+
+            .admin-container {
+                padding: 30px;
+            }
+
+            footer {
+                padding: 40px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                flex-direction: column;
+                gap: 0;
+                background: var(--dark-elegance);
+                border-bottom: 1px solid var(--border-color);
+                padding: 20px;
+            }
+
+            nav[dir="rtl"] .nav-links {
+                flex-direction: column;
+            }
+
+            .nav-links.active {
+                display: flex;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .logo {
+                font-size: 20px;
+            }
+
+            .hero {
+                min-height: 70vh;
+                padding: 40px 20px;
+            }
+
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            .features-section {
+                padding: 60px 20px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .login-form {
+                padding: 40px 30px;
+            }
+
+            .admin-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+
+            .admin-tabs {
+                justify-content: flex-start;
+                overflow-x: auto;
+            }
+
+            .data-table {
+                font-size: 12px;
+            }
+
+            .data-table th, .data-table td {
+                padding: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            nav {
+                padding: 12px 16px;
+            }
+
+            .nav-container {
+                gap: 20px;
+            }
+
+            .nav-controls {
+                gap: 10px;
+            }
+
+            .language-switcher {
+                padding: 4px 6px;
+            }
+
+            .lang-btn {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+
+            .hero {
+                min-height: 60vh;
+                padding: 30px 16px;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .hero p {
+                font-size: 14px;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .btn-primary, .btn-secondary {
+                width: 100%;
+                padding: 14px;
+            }
+
+            .stats-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .features-section {
+                padding: 40px 16px;
+            }
+
+            .section-header h2 {
+                font-size: 28px;
+            }
+
+            .feature-card {
+                padding: 24px;
+            }
+
+            .login-form {
+                padding: 30px 20px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            footer {
+                padding: 30px 16px;
+            }
+
+            .footer-grid {
+                gap: 30px;
+            }
+        }
+
+        /* ==================== TOAST NOTIFICATIONS ==================== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(42, 36, 41, 0.95);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--soft-gold);
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: var(--text-light);
+            font-size: 13px;
+            animation: slideInRight 0.3s ease-out;
+            z-index: 2000;
+            max-width: 300px;
+        }
+
+        body[dir="rtl"] .toast {
+            right: auto;
+            left: 30px;
+            border-left: none;
+            border-right: 4px solid var(--soft-gold);
+            animation: slideInLeft 0.3s ease-out;
+        }
+
+        .toast.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast.success {
+            border-left-color: #4ade80;
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="bg-gradient"></div>
+
+    <!-- NAVIGATION -->
+    <nav dir="ltr">
+        <div class="nav-container">
+            <span class="logo" onclick="goToLanding()">Sally</span>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#features" onclick="showLanding()">Features</a></li>
+                <li><a href="#services" onclick="showLanding()">Services</a></li>
+                <li><a href="#safety" onclick="showLanding()">Safety</a></li>
+                <li><a href="#how" onclick="showLanding()">How It Works</a></li>
+            </ul>
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <div class="nav-controls">
+            <div class="language-switcher">
+                <button class="lang-btn active" data-lang="fr">FR</button>
+                <button class="lang-btn" data-lang="ar">AR</button>
+                <button class="lang-btn" data-lang="en">EN</button>
+            </div>
+            <button class="theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i>
+            </button>
+            <button class="btn-admin" id="authBtn">Admin Login</button>
+            <div class="user-menu" id="userMenu" style="display:none;">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="#" onclick="showDashboard()">Dashboard</a>
+                    <a href="#" onclick="logout()">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <!-- LANDING PAGE SECTIONS -->
+
+        <!-- HERO -->
+        <section class="hero landing-section active" id="heroSection">
+            <div class="hero-content">
+                <h1 data-i18n="hero_title_1">Travel Safe</h1>
+                <h1 data-i18n="hero_title_2" style="margin-bottom: 30px;">Women Only</h1>
+                <p data-i18n="hero_subtitle">Morocco's first female-only ridesharing platform. Verified drivers, facial verification and integrated SOS system.</p>
+                <div class="hero-buttons">
+                    <button class="btn-primary" data-i18n="btn_download" onclick="downloadApp()">Download App</button>
+                    <button class="btn-secondary" data-i18n="btn_discover" onclick="scrollToSection('features')">Discover</button>
+                </div>
+                <div class="stats-section scroll-animate">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statUsers">12K+</div>
+                        <div class="stat-label" data-i18n="badge_users">Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statDrivers">2.5K+</div>
+                        <div class="stat-label" data-i18n="badge_drivers">Drivers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statCities">8+</div>
+                        <div class="stat-label" data-i18n="badge_cities">Cities</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statRating">4.8★</div>
+                        <div class="stat-label" data-i18n="badge_rating">Average Rating</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FEATURES -->
+        <section class="features-section landing-section active" id="features">
+            <div class="section-header scroll-animate">
+                <h2 data-i18n="features_title">Why Go With Sally?</h2>
+                <p data-i18n="features_subtitle">A transport experience designed by and for women</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-face-smile"></i></div>
+                    <h3 data-i18n="feature_1_title">Maximum Safety</h3>
+                    <p data-i18n="feature_1_desc">AI facial verification, QR validation, real-time GPS tracking and SOS button</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-women"></i></div>
+                    <h3 data-i18n="feature_2_title">100% Female</h3>
+                    <p data-i18n="feature_2_desc">All drivers verified. AI gender verification during registration</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-tag"></i></div>
+                    <h3 data-i18n="feature_3_title">Transparent Pricing</h3>
+                    <p data-i18n="feature_3_desc">Name Your Price system - propose and see acceptance in real-time</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-radar"></i></div>
+                    <h3 data-i18n="feature_4_title">Smart Detection</h3>
+                    <p data-i18n="feature_4_desc">Advanced proximity algorithm finds nearest driver in seconds</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-star"></i></div>
+                    <h3 data-i18n="feature_5_title">Badge System</h3>
+                    <p data-i18n="feature_5_desc">Gamification with badges to reward loyalty and excellence</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-comments"></i></div>
+                    <h3 data-i18n="feature_6_title">Real-time Chat</h3>
+                    <p data-i18n="feature_6_desc">Direct communication with driver via integrated chat</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SERVICES -->
+        <section class="features-section landing-section active" id="services">
+            <div class="section-header scroll-animate">
+                <h2 data-i18n="services_title">Our Services</h2>
+                <p data-i18n="services_subtitle">A service adapted to every need</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-leaf"></i></div>
+                    <h3 data-i18n="service_1_name">Sally Eco</h3>
+                    <p data-i18n="service_1_desc">Economic and eco-friendly</p>
+                    <p style="color: var(--soft-gold); font-weight: 700; margin-top: 16px;" data-i18n="service_1_price">From 10 MAD</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-car"></i></div>
+                    <h3 data-i18n="service_2_name">Sally Standard</h3>
+                    <p data-i18n="service_2_desc">The popular choice</p>
+                    <p style="color: var(--soft-gold); font-weight: 700; margin-top: 16px;" data-i18n="service_2_price">From 15 MAD</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-crown"></i></div>
+                    <h3 data-i18n="service_3_name">Sally Comfort</h3>
+                    <p data-i18n="service_3_desc">Premium vehicles</p>
+                    <p style="color: var(--soft-gold); font-weight: 700; margin-top: 16px;" data-i18n="service_3_price">From 25 MAD</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-users"></i></div>
+                    <h3 data-i18n="service_4_name">Sally Pool</h3>
+                    <p data-i18n="service_4_desc">Share and save</p>
+                    <p style="color: var(--soft-gold); font-weight: 700; margin-top: 16px;" data-i18n="service_4_price">From 8 MAD</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SAFETY -->
+        <section class="features-section landing-section active" id="safety">
+            <div class="section-header scroll-animate">
+                <h2 data-i18n="safety_title">Your Safety is Our Priority</h2>
+                <p data-i18n="safety_subtitle">Advanced technology for your peace of mind</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-shield"></i></div>
+                    <h3 data-i18n="safety_1_title">AI Facial Verification</h3>
+                    <p data-i18n="safety_1_desc">Advanced facial recognition ensuring identity of every driver</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-location-dot"></i></div>
+                    <h3 data-i18n="safety_2_title">Real-time GPS Tracking</h3>
+                    <p data-i18n="safety_2_desc">Share your trip with loved ones for real-time tracking</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <h3 data-i18n="safety_3_title">Integrated SOS Button</h3>
+                    <p data-i18n="safety_3_desc">One click for emergency - contact authorities and support</p>
+                </div>
+                <div class="feature-card scroll-animate">
+                    <div class="feature-icon"><i class="fas fa-qrcode"></i></div>
+                    <h3 data-i18n="safety_4_title">QR Validation</h3>
+                    <p data-i18n="safety_4_desc">Scan QR at departure to confirm identity before ride</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ADMIN LOGIN SECTION -->
+        <section class="login-container" id="loginContainer">
+            <div class="login-form">
+                <h2>Admin</h2>
+                <p data-i18n="btn_admin">Admin Login</p>
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" placeholder="admin@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="••••••••" required>
+                    </div>
+                    <div class="error-message" id="loginError"></div>
+                    <button type="submit" class="btn-submit" id="loginBtn">Login</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ADMIN DASHBOARD SECTION -->
+        <section class="admin-container" id="adminContainer">
+            <div class="admin-header">
+                <div>
+                    <h2>Admin Dashboard</h2>
+                    <p style="color: var(--text-muted); margin-top: 4px;">Welcome back!</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" style="padding: 10px 20px; font-size: 13px;" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button class="btn-secondary" style="padding: 10px 20px; font-size: 13px; border-color: var(--rose-gold); color: var(--rose-gold);" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="switchAdminTab('overview')">Overview</button>
+                <button class="admin-tab" onclick="switchAdminTab('users')">Users</button>
+                <button class="admin-tab" onclick="switchAdminTab('drivers')">Drivers</button>
+                <button class="admin-tab" onclick="switchAdminTab('rides')">Rides</button>
+                <button class="admin-tab" onclick="switchAdminTab('analytics')">Analytics</button>
+                <button class="admin-tab" onclick="switchAdminTab('revenue')">Revenue</button>
+            </div>
+
+            <!-- OVERVIEW TAB -->
+            <div class="admin-panel active" id="overviewPanel">
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-label">Total Users</div>
+                        <div class="card-value" id="cardTotalUsers">--</div>
+                        <div class="card-change" id="cardUsersChange">+0% this month</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Active Drivers</div>
+                        <div class="card-value" id="cardActiveDrivers">--</div>
+                        <div class="card-change" id="cardDriversChange">+0% this month</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Today's Rides</div>
+                        <div class="card-value" id="cardTodayRides">--</div>
+                        <div class="card-change" id="cardRidesChange">+0% vs yesterday</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Total Revenue</div>
+                        <div class="card-value" id="cardTotalRevenue">--</div>
+                        <div class="card-change" id="cardRevenueChange">+0% this month</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Avg Rating</div>
+                        <div class="card-value" id="cardAvgRating">4.8★</div>
+                        <div class="card-change">Based on reviews</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">API Status</div>
+                        <div class="card-value" style="color: #4ade80; font-size: 24px;" id="cardAPIStatus">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="card-change">Online</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div class="chart-title">Revenue Trend (Last 30 Days)</div>
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">User Growth</div>
+                        <canvas id="usersChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Driver Activity</div>
+                        <canvas id="driversChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Rides by Service Type</div>
+                        <canvas id="ridesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USERS TAB -->
+            <div class="admin-panel" id="usersPanel">
+                <h3 style="margin-bottom: 20px; color: var(--text-light);">User Management</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Joined</th>
+                            <th>Rides</th>
+                            <th>Rating</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading users...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- DRIVERS TAB -->
+            <div class="admin-panel" id="driversPanel">
+                <h3 style="margin-bottom: 20px; color: var(--text-light);">Driver Management</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Vehicle</th>
+                            <th>Joined</th>
+                            <th>Rides</th>
+                            <th>Rating</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driversTableBody">
+                        <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Loading drivers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- RIDES TAB -->
+            <div class="admin-panel" id="ridesPanel">
+                <h3 style="margin-bottom: 20px; color: var(--text-light);">Active Rides & Monitoring</h3>
+                <div id="rideMap"></div>
+                <table class="data-table" style="margin-top: 40px;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Passenger</th>
+                            <th>Driver</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Price</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ridesTableBody">
+                        <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">Loading rides...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ANALYTICS TAB -->
+            <div class="admin-panel" id="analyticsPanel">
+                <h3 style="margin-bottom: 30px; color: var(--text-light);">Analytics & Insights</h3>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div class="chart-title">Peak Hours</div>
+                        <canvas id="analyticsChart1"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">City Distribution</div>
+                        <canvas id="analyticsChart2"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Service Type Preferences</div>
+                        <canvas id="analyticsChart3"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">User Retention</div>
+                        <canvas id="analyticsChart4"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REVENUE TAB -->
+            <div class="admin-panel" id="revenuePanel">
+                <h3 style="margin-bottom: 30px; color: var(--text-light);">Revenue & Financial Reports</h3>
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-label">Total Revenue (YTD)</div>
+                        <div class="card-value" id="revenueTotalYTD">--</div>
+                        <div class="card-change positive">+15% vs last year</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Commission Earned</div>
+                        <div class="card-value" id="revenueCommission">--</div>
+                        <div class="card-change">15% platform fee</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Driver Payouts</div>
+                        <div class="card-value" id="revenuePayouts">--</div>
+                        <div class="card-change">85% to drivers</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Avg Ride Value</div>
+                        <div class="card-value" id="revenueAvgRide">--</div>
+                        <div class="card-change">Including tips</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-top: 40px;">
+                    <div class="chart-container">
+                        <div class="chart-title">Monthly Revenue</div>
+                        <canvas id="revenueChartMonthly"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Revenue by Service Type</div>
+                        <canvas id="revenueChartService"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Payment Methods</div>
+                        <canvas id="revenueChartPayment"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Daily Revenue Trend</div>
+                        <canvas id="revenueChartDaily"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- FOOTER -->
+    <footer dir="ltr">
+        <div class="footer-grid">
+            <div class="footer-column">
+                <h3 data-i18n="footer_product">Product</h3>
+                <a href="#" data-i18n="footer_features">Features</a>
+                <a href="#" data-i18n="footer_services">Services</a>
+                <a href="#" data-i18n="footer_pricing">Pricing</a>
+            </div>
+            <div class="footer-column">
+                <h3 data-i18n="footer_company">Company</h3>
+                <a href="#" data-i18n="footer_about">About</a>
+                <a href="#" data-i18n="footer_blog">Blog</a>
+                <a href="#" data-i18n="footer_careers">Careers</a>
+            </div>
+            <div class="footer-column">
+                <h3 data-i18n="footer_legal">Legal</h3>
+                <a href="#" data-i18n="footer_privacy">Privacy Policy</a>
+                <a href="#" data-i18n="footer_terms">Terms of Use</a>
+                <a href="#" data-i18n="footer_cookies">Cookie Management</a>
+            </div>
+            <div class="footer-column">
+                <h3>Connect</h3>
+                <a href="#">Twitter</a>
+                <a href="#">Instagram</a>
+                <a href="#">LinkedIn</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p data-i18n="footer_copyright">© 2024 Go With Sally. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // ==================== CONSTANTS & CONFIG ====================
+        // Read from meta tag or fallback to localhost (set via Docker/Nginx env)
+        const API_BASE = (document.querySelector('meta[name="api-base-url"]')?.content) || 'http://localhost:5000/api';
+        const SOCKET_URL = (document.querySelector('meta[name="socket-url"]')?.content) || 'http://localhost:5000';
+
+        const translations = {
+            fr: {
+                page_title: "Go With Sally - Voyagez en Sécurité",
+                nav_features: "Fonctionnalités",
+                nav_services: "Services",
+                nav_safety: "Sécurité",
+                nav_how: "Comment ça marche",
+                nav_download: "Télécharger",
+                btn_admin: "Connexion Admin",
+                hero_title_1: "Voyagez en Sécurité",
+                hero_title_2: "Entre Femmes Seulement",
+                hero_subtitle: "Première plateforme VTC féminine du Maroc. Conductrices vérifiées, vérification faciale et SOS intégré.",
+                btn_download: "Télécharger l'app",
+                btn_discover: "Découvrir",
+                badge_users: "Utilisatrices",
+                badge_drivers: "Conductrices",
+                badge_cities: "Villes",
+                badge_rating: "Note Moyenne",
+                features_title: "Pourquoi Go With Sally?",
+                features_subtitle: "Une expérience de transport pensée par et pour les femmes",
+                feature_1_title: "Sécurité Maximum",
+                feature_1_desc: "Vérification faciale IA, validation QR, suivi GPS en temps réel et bouton SOS",
+                feature_2_title: "100% Féminin",
+                feature_2_desc: "Toutes nos conductrices vérifiées. Vérification du genre par IA",
+                feature_3_title: "Tarification Transparente",
+                feature_3_desc: "Système 'Nommez votre Prix' - proposez et voyez l'acceptation",
+                feature_4_title: "Détection Intelligente",
+                feature_4_desc: "Algorithme de proximité trouvant la conductrice la plus proche",
+                feature_5_title: "Système de Badges",
+                feature_5_desc: "Gamification avec badges récompensant loyauté et excellence",
+                feature_6_title: "Chat en Temps Réel",
+                feature_6_desc: "Communication directe avec votre conductrice via chat intégré",
+                services_title: "Nos Services",
+                services_subtitle: "Un service adapté à chaque besoin",
+                service_1_name: "Sally Eco",
+                service_1_desc: "Économique et écologique",
+                service_1_price: "À partir de 10 DH",
+                service_2_name: "Sally Standard",
+                service_2_desc: "Le choix populaire",
+                service_2_price: "À partir de 15 DH",
+                service_3_name: "Sally Comfort",
+                service_3_desc: "Véhicules premium",
+                service_3_price: "À partir de 25 DH",
+                service_4_name: "Sally Pool",
+                service_4_desc: "Partagez et économisez",
+                service_4_price: "À partir de 8 DH",
+                safety_title: "Votre Sécurité est Notre Priorité",
+                safety_subtitle: "Technologie avancée pour votre tranquillité",
+                safety_1_title: "Vérification Faciale IA",
+                safety_1_desc: "Reconnaissance faciale avancée pour identité confirmée",
+                safety_2_title: "Suivi GPS Temps Réel",
+                safety_2_desc: "Partagez votre trajet avec vos proches",
+                safety_3_title: "Bouton SOS Intégré",
+                safety_3_desc: "Un clic pour appeler urgences et support 24/7",
+                safety_4_title: "Validation QR",
+                safety_4_desc: "Scan QR avant départ pour confirmer identité",
+                footer_product: "Produit",
+                footer_features: "Fonctionnalités",
+                footer_services: "Services",
+                footer_pricing: "Tarification",
+                footer_company: "Entreprise",
+                footer_about: "À propos",
+                footer_blog: "Blog",
+                footer_careers: "Emplois",
+                footer_legal: "Légal",
+                footer_privacy: "Politique de Confidentialité",
+                footer_terms: "Conditions d'Utilisation",
+                footer_cookies: "Gestion des Cookies",
+                footer_copyright: "© 2024 Go With Sally. Tous droits réservés."
+            },
+            ar: {
+                page_title: "اذهبي مع سالي - اسافري بأمان",
+                nav_features: "الميزات",
+                nav_services: "الخدمات",
+                nav_safety: "الأمان",
+                nav_how: "كيف يعمل",
+                nav_download: "تحميل",
+                btn_admin: "دخول المسؤول",
+                hero_title_1: "اسافري بأمان",
+                hero_title_2: "بين النساء فقط",
+                hero_subtitle: "أول منصة تطبيق أوبر في المغرب حصرية للنساء. سائقات معتمدات، التحقق من الوجه والنظام sos المدمج.",
+                btn_download: "تحميل التطبيق",
+                btn_discover: "اكتشفي",
+                badge_users: "مستخدمات",
+                badge_drivers: "سائقات",
+                badge_cities: "مدن",
+                badge_rating: "متوسط التقييم",
+                features_title: "لماذا اذهبي مع سالي؟",
+                features_subtitle: "تجربة نقل تم التفكير فيها من قبل وللنساء",
+                feature_1_title: "أقصى أمان",
+                feature_1_desc: "التحقق من الوجه بالذكاء الاصطناعي، رمز الاستجابة السريعة، تتبع GPS وزر sos",
+                feature_2_title: "100% نسائي",
+                feature_2_desc: "جميع سائقاتنا متحققات. التحقق من النوع الاجتماعي بالذكاء الاصطناعي",
+                feature_3_title: "تسعير شفاف",
+                feature_3_desc: "نظام 'اسمي السعر' - اقترحي السعر وشوفي احتمالية القبول",
+                feature_4_title: "الكشف الذكي",
+                feature_4_desc: "خوارزمية القرب المتقدمة للعثور على السائقة الأقرب",
+                feature_5_title: "نظام الشارات",
+                feature_5_desc: "التلعيب مع الشارات لمكافأة الولاء وتميز الخدمة",
+                feature_6_title: "الدردشة في الوقت الفعلي",
+                feature_6_desc: "الاتصال المباشر مع سائقتك عبر الدردشة المدمجة",
+                services_title: "خدماتنا",
+                services_subtitle: "خدمة مناسبة لكل احتياج",
+                service_1_name: "سالي إيكو",
+                service_1_desc: "اقتصادي وصديق للبيئة",
+                service_1_price: "من 10 درهم",
+                service_2_name: "سالي ستاندرد",
+                service_2_desc: "الخيار الشعبي",
+                service_2_price: "من 15 درهم",
+                service_3_name: "سالي كومفور",
+                service_3_desc: "سيارات فاخرة",
+                service_3_price: "من 25 درهم",
+                service_4_name: "سالي بول",
+                service_4_desc: "شاركي واقتصدي",
+                service_4_price: "من 8 درهم",
+                safety_title: "أمانك هو أولويتنا",
+                safety_subtitle: "تكنولوجيا متقدمة لراحة بالك",
+                safety_1_title: "التحقق من الوجه بالذكاء الاصطناعي",
+                safety_1_desc: "التعرف على الوجه المتقدم لضمان الهوية المؤكدة",
+                safety_2_title: "تتبع GPS الفوري",
+                safety_2_desc: "شاركي رحلتك مع أحبائك. يمكنهم متابعتك مباشرة",
+                safety_3_title: "زر sos المدمج",
+                safety_3_desc: "استدعاء طوارئ فوري. نقرة واحدة للاتصال بالسلطات",
+                safety_4_title: "التحقق برمز الاستجابة السريعة",
+                safety_4_desc: "مسح رمز الاستجابة السريعة عند المغادرة لتأكيد الهوية",
+                footer_product: "المنتج",
+                footer_features: "الميزات",
+                footer_services: "الخدمات",
+                footer_pricing: "التسعير",
+                footer_company: "الشركة",
+                footer_about: "عن",
+                footer_blog: "مدونة",
+                footer_careers: "الوظائف",
+                footer_legal: "قانوني",
+                footer_privacy: "سياسة الخصوصية",
+                footer_terms: "شروط الاستخدام",
+                footer_cookies: "إدارة ملفات تعريف الارتباط",
+                footer_copyright: "© 2024 اذهبي مع سالي. جميع الحقوق محفوظة."
+            },
+            en: {
+                page_title: "Go With Sally - Travel Safe",
+                nav_features: "Features",
+                nav_services: "Services",
+                nav_safety: "Safety",
+                nav_how: "How it Works",
+                nav_download: "Download",
+                btn_admin: "Admin Login",
+                hero_title_1: "Travel Safe",
+                hero_title_2: "Women Only",
+                hero_subtitle: "Morocco's first female-only ridesharing platform. Verified drivers, facial verification and integrated SOS system.",
+                btn_download: "Download App",
+                btn_discover: "Discover",
+                badge_users: "Users",
+                badge_drivers: "Drivers",
+                badge_cities: "Cities",
+                badge_rating: "Average Rating",
+                features_title: "Why Go With Sally?",
+                features_subtitle: "A transport experience designed by and for women",
+                feature_1_title: "Maximum Safety",
+                feature_1_desc: "AI facial verification, QR validation, real-time GPS tracking and SOS button",
+                feature_2_title: "100% Female",
+                feature_2_desc: "All our drivers are verified. Gender verification by AI during registration",
+                feature_3_title: "Transparent Pricing",
+                feature_3_desc: "Name Your Price system - propose your price and see acceptance probability",
+                feature_4_title: "Smart Detection",
+                feature_4_desc: "Advanced proximity algorithm to find the nearest driver in seconds",
+                feature_5_title: "Badge System",
+                feature_5_desc: "Gamification with badges to reward loyalty and service excellence",
+                feature_6_title: "Real-time Chat",
+                feature_6_desc: "Direct communication with your driver via integrated chat with presence indicators",
+                services_title: "Our Services",
+                services_subtitle: "A service adapted to every need",
+                service_1_name: "Sally Eco",
+                service_1_desc: "Economic and eco-friendly",
+                service_1_price: "From 10 MAD",
+                service_2_name: "Sally Standard",
+                service_2_desc: "The popular choice",
+                service_2_price: "From 15 MAD",
+                service_3_name: "Sally Comfort",
+                service_3_desc: "Premium vehicles",
+                service_3_price: "From 25 MAD",
+                service_4_name: "Sally Pool",
+                service_4_desc: "Share and save",
+                service_4_price: "From 8 MAD",
+                safety_title: "Your Safety is Our Priority",
+                safety_subtitle: "Advanced technology for your peace of mind",
+                safety_1_title: "AI Facial Verification",
+                safety_1_desc: "Advanced facial recognition ensuring confirmed identity of every driver",
+                safety_2_title: "Real-time GPS Tracking",
+                safety_2_desc: "Share your trip with loved ones. They can follow you directly from start to finish",
+                safety_3_title: "Integrated SOS Button",
+                safety_3_desc: "Instant emergency call. One click to contact authorities and our 24/7 support team",
+                safety_4_title: "QR Validation",
+                safety_4_desc: "QR scan at departure to confirm identity. Impossible to start ride without validation",
+                footer_product: "Product",
+                footer_features: "Features",
+                footer_services: "Services",
+                footer_pricing: "Pricing",
+                footer_company: "Company",
+                footer_about: "About",
+                footer_blog: "Blog",
+                footer_careers: "Careers",
+                footer_legal: "Legal",
+                footer_privacy: "Privacy Policy",
+                footer_terms: "Terms of Use",
+                footer_cookies: "Cookie Management",
+                footer_copyright: "© 2024 Go With Sally. All rights reserved."
+            }
+        };
+
+        // ==================== STATE ====================
+        let currentLanguage = localStorage.getItem('gws-language') || 'fr';
+        let currentTheme = localStorage.getItem('gws-theme') || 'dark';
+        let authToken = localStorage.getItem('gws-token');
+        let currentUser = localStorage.getItem('gws-user') ? JSON.parse(localStorage.getItem('gws-user')) : null;
+        let socket = null;
+        let charts = {};
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // Set initial language and theme
+            setLanguage(currentLanguage);
+            setTheme(currentTheme);
+
+            // Setup event listeners
+            setupLanguageSwitcher();
+            setupThemeToggle();
+            setupMenuToggle();
+            setupScrollAnimations();
+            setupUserMenu();
+
+            // Check authentication
+            if (authToken) {
+                showDashboard();
+            }
+
+            // Initialize Socket.IO for real-time updates
+            initializeSocket();
+
+            console.log('Go With Sally initialized');
+        }
+
+        // ==================== LANGUAGE MANAGEMENT ====================
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            localStorage.setItem('gws-language', lang);
+            document.documentElement.lang = lang;
+
+            // Set RTL/LTR
+            if (lang === 'ar') {
+                document.body.dir = 'rtl';
+                document.querySelector('nav').dir = 'rtl';
+                document.querySelector('footer').dir = 'rtl';
+            } else {
+                document.body.dir = 'ltr';
+                document.querySelector('nav').dir = 'ltr';
+                document.querySelector('footer').dir = 'ltr';
+            }
+
+            // Update active button
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+            });
+
+            // Translate all elements
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                const text = translations[lang]?.[key] || translations['en'][key];
+                if (element.tagName === 'TITLE') {
+                    element.textContent = text;
+                } else {
+                    element.textContent = text;
+                }
+            });
+        }
+
+        function setupLanguageSwitcher() {
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setLanguage(btn.getAttribute('data-lang'));
+                });
+            });
+        }
+
+        // ==================== THEME MANAGEMENT ====================
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('gws-theme', theme);
+            document.body.setAttribute('data-theme', theme);
+
+            const themeToggle = document.getElementById('themeToggle');
+            if (themeToggle) {
+                themeToggle.innerHTML = theme === 'dark' ?
+                    '<i class="fas fa-sun"></i>' :
+                    '<i class="fas fa-moon"></i>';
+            }
+        }
+
+        function setupThemeToggle() {
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+        }
+
+        // ==================== MOBILE MENU ====================
+        function setupMenuToggle() {
+            const menuToggle = document.getElementById('menuToggle');
+            const navLinks = document.getElementById('navLinks');
+
+            menuToggle?.addEventListener('click', () => {
+                navLinks.classList.toggle('active');
+            });
+
+            navLinks?.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    navLinks.classList.remove('active');
+                });
+            });
+        }
+
+        // ==================== USER MENU ====================
+        function setupUserMenu() {
+            const userAvatar = document.getElementById('userAvatar');
+            const userDropdown = document.getElementById('userDropdown');
+
+            userAvatar?.addEventListener('click', () => {
+                userDropdown.classList.toggle('active');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.user-menu')) {
+                    userDropdown?.classList.remove('active');
+                }
+            });
+        }
+
+        // ==================== SCROLL ANIMATIONS ====================
+        function setupScrollAnimations() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.scroll-animate').forEach(el => {
+                observer.observe(el);
+            });
+        }
+
+        // ==================== AUTHENTICATION ====================
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginError = document.getElementById('loginError');
+
+            loginBtn.disabled = true;
+            loginError.classList.remove('show');
+
+            try {
+                const response = await axios.post(`${API_BASE}/auth/login`, {
+                    email,
+                    password
+                });
+
+                if (response.data.token) {
+                    authToken = response.data.token;
+                    currentUser = response.data.user;
+
+                    localStorage.setItem('gws-token', authToken);
+                    localStorage.setItem('gws-user', JSON.stringify(currentUser));
+
+                    // Update avatar
+                    document.getElementById('userAvatar').textContent =
+                        currentUser.name?.charAt(0).toUpperCase() || 'A';
+
+                    showDashboard();
+                    showToast('Login successful!', 'success');
+                }
+            } catch (error) {
+                loginError.textContent = error.response?.data?.message || 'Login failed. Please check your credentials.';
+                loginError.classList.add('show');
+                console.error('Login error:', error);
+            } finally {
+                loginBtn.disabled = false;
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('gws-token');
+            localStorage.removeItem('gws-user');
+
+            document.getElementById('loginForm').reset();
+            document.getElementById('userMenu').style.display = 'none';
+            document.getElementById('authBtn').style.display = 'inline-block';
+
+            showLanding();
+            showToast('Logged out successfully', 'success');
+        }
+
+        // ==================== NAVIGATION ====================
+        function showLanding() {
+            document.getElementById('loginContainer').classList.remove('active');
+            document.getElementById('adminContainer').classList.remove('active');
+            document.querySelectorAll('.landing-section').forEach(s => s.classList.add('active'));
+        }
+
+        function showDashboard() {
+            if (!authToken) {
+                showLogin();
+                return;
+            }
+
+            document.querySelectorAll('.landing-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('loginContainer').classList.remove('active');
+            document.getElementById('adminContainer').classList.add('active');
+            document.getElementById('userMenu').style.display = 'block';
+            document.getElementById('authBtn').style.display = 'none';
+
+            loadDashboardData();
+        }
+
+        function showLogin() {
+            document.querySelectorAll('.landing-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('adminContainer').classList.remove('active');
+            document.getElementById('loginContainer').classList.add('active');
+        }
+
+        function goToLanding() {
+            showLanding();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        document.getElementById('authBtn')?.addEventListener('click', () => {
+            if (authToken) {
+                showDashboard();
+            } else {
+                showLogin();
+            }
+        });
+
+        // ==================== ADMIN TABS ====================
+        function switchAdminTab(tabName) {
+            // Update active tab button
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.textContent.toLowerCase().includes(tabName));
+            });
+
+            // Show/hide panels
+            document.querySelectorAll('.admin-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+
+            const panelMap = {
+                'overview': 'overviewPanel',
+                'users': 'usersPanel',
+                'drivers': 'driversPanel',
+                'rides': 'ridesPanel',
+                'analytics': 'analyticsPanel',
+                'revenue': 'revenuePanel'
+            };
+
+            const panelId = panelMap[tabName];
+            if (panelId) {
+                document.getElementById(panelId).classList.add('active');
+
+                // Reinitialize charts if needed
+                if (tabName === 'overview' || tabName === 'analytics' || tabName === 'revenue') {
+                    setTimeout(() => {
+                        initializeCharts();
+                    }, 100);
+                }
+            }
+        }
+
+        // ==================== DATA LOADING ====================
+        async function loadDashboardData() {
+            try {
+                const headers = { Authorization: `Bearer ${authToken}` };
+
+                // Load overview data
+                const [users, drivers, rides, stats] = await Promise.all([
+                    axios.get(`${API_BASE}/users`, { headers }).catch(() => ({ data: [] })),
+                    axios.get(`${API_BASE}/drivers`, { headers }).catch(() => ({ data: [] })),
+                    axios.get(`${API_BASE}/rides`, { headers }).catch(() => ({ data: [] })),
+                    axios.get(`${API_BASE}/stats`, { headers }).catch(() => ({ data: {} }))
+                ]);
+
+                // Update dashboard cards
+                const statsData = stats.data || {};
+                document.getElementById('cardTotalUsers').textContent = statsData.totalUsers || '12K+';
+                document.getElementById('cardActiveDrivers').textContent = statsData.activeDrivers || '2.5K+';
+                document.getElementById('cardTodayRides').textContent = statsData.todayRides || '0';
+                document.getElementById('cardTotalRevenue').textContent = statsData.totalRevenue || '0 MAD';
+                document.getElementById('cardUsersChange').textContent = statsData.usersChange || '+0% this month';
+                document.getElementById('cardDriversChange').textContent = statsData.driversChange || '+0% this month';
+                document.getElementById('cardRidesChange').textContent = statsData.ridesChange || '+0% vs yesterday';
+                document.getElementById('cardRevenueChange').textContent = statsData.revenueChange || '+0% this month';
+
+                // Update tables
+                loadUsersTable(users.data);
+                loadDriversTable(drivers.data);
+                loadRidesTable(rides.data);
+
+                // Initialize charts
+                initializeCharts();
+
+                // Initialize map
+                initializeMap(rides.data);
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showToast('Error loading dashboard data', 'error');
+            }
+        }
+
+        function loadUsersTable(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if (!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No users found</td></tr>';
+                return;
+            }
+
+            users.slice(0, 10).forEach(user => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${user.id || '--'}</td>
+                        <td>${user.name || '--'}</td>
+                        <td>${user.email || '--'}</td>
+                        <td>${user.phone || '--'}</td>
+                        <td>${user.joinedDate ? new Date(user.joinedDate).toLocaleDateString() : '--'}</td>
+                        <td>${user.ridesCount || 0}</td>
+                        <td>${user.rating ? user.rating.toFixed(1) : '--'}</td>
+                        <td><span class="status-badge status-${user.status || 'active'}">${user.status || 'ACTIVE'}</span></td>
+                        <td><button class="btn-primary" style="padding: 4px 12px; font-size: 11px;">View</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function loadDriversTable(drivers) {
+            const tbody = document.getElementById('driversTableBody');
+            tbody.innerHTML = '';
+
+            if (!drivers || drivers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">No drivers found</td></tr>';
+                return;
+            }
+
+            drivers.slice(0, 10).forEach(driver => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${driver.id || '--'}</td>
+                        <td>${driver.name || '--'}</td>
+                        <td>${driver.email || '--'}</td>
+                        <td>${driver.phone || '--'}</td>
+                        <td>${driver.vehicleModel || '--'}</td>
+                        <td>${driver.joinedDate ? new Date(driver.joinedDate).toLocaleDateString() : '--'}</td>
+                        <td>${driver.ridesCount || 0}</td>
+                        <td>${driver.rating ? driver.rating.toFixed(1) : '--'}</td>
+                        <td><span class="status-badge status-${driver.status || 'active'}">${driver.status || 'ACTIVE'}</span></td>
+                        <td><button class="btn-primary" style="padding: 4px 12px; font-size: 11px;">View</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function loadRidesTable(rides) {
+            const tbody = document.getElementById('ridesTableBody');
+            tbody.innerHTML = '';
+
+            if (!rides || rides.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">No rides found</td></tr>';
+                return;
+            }
+
+            rides.slice(0, 10).forEach(ride => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${ride.id || '--'}</td>
+                        <td>${ride.passengerName || '--'}</td>
+                        <td>${ride.driverName || '--'}</td>
+                        <td>${ride.pickupLocation || '--'}</td>
+                        <td>${ride.dropoffLocation || '--'}</td>
+                        <td>${ride.serviceType || '--'}</td>
+                        <td><span class="status-badge status-${ride.status || 'active'}">${ride.status || 'ACTIVE'}</span></td>
+                        <td>${ride.duration || '--'}</td>
+                        <td>${ride.price ? ride.price + ' MAD' : '--'}</td>
+                        <td><button class="btn-primary" style="padding: 4px 12px; font-size: 11px;">Track</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ==================== CHARTS ====================
+        function initializeCharts() {
+            destroyCharts();
+
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart')?.getContext('2d');
+            if (revenueCtx) {
+                charts.revenue = new Chart(revenueCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                        datasets: [{
+                            label: 'Revenue (MAD)',
+                            data: [45000, 52000, 48000, 61000],
+                            borderColor: '#D4AF37',
+                            backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#D4AF37',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                labels: { color: 'var(--text-light)' }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: 'var(--text-muted)' },
+                                grid: { color: 'rgba(212, 175, 55, 0.1)' }
+                            },
+                            x: {
+                                ticks: { color: 'var(--text-muted)' },
+                                grid: { color: 'rgba(212, 175, 55, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Users Growth Chart
+            const usersCtx = document.getElementById('usersChart')?.getContext('2d');
+            if (usersCtx) {
+                charts.users = new Chart(usersCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [{
+                            label: 'New Users',
+                            data: [800, 1200, 1600, 2100, 2400, 2800],
+                            backgroundColor: 'rgba(183, 110, 121, 0.7)',
+                            borderColor: '#B76E79',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                labels: { color: 'var(--text-light)' }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: 'var(--text-muted)' },
+                                grid: { color: 'rgba(212, 175, 55, 0.1)' }
+                            },
+                            x: {
+                                ticks: { color: 'var(--text-muted)' },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Drivers Chart
+            const driversCtx = document.getElementById('driversChart')?.getContext('2d');
+            if (driversCtx) {
+                charts.drivers = new Chart(driversCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Active', 'Inactive', 'On Break'],
+                        datasets: [{
+                            data: [1800, 600, 100],
+                            backgroundColor: [
+                                'rgba(212, 175, 55, 0.8)',
+                                'rgba(183, 110, 121, 0.8)',
+                                'rgba(255, 20, 147, 0.8)'
+                            ],
+                            borderColor: 'var(--dark-card)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                labels: { color: 'var(--text-light)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Rides Chart
+            const ridesCtx = document.getElementById('ridesChart')?.getContext('2d');
+            if (ridesCtx) {
+                charts.rides = new Chart(ridesCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Eco', 'Standard', 'Comfort', 'Pool'],
+                        datasets: [{
+                            data: [25, 45, 20, 10],
+                            backgroundColor: [
+                                '#4ade80',
+                                '#D4AF37',
+                                '#B76E79',
+                                '#FF1493'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                labels: { color: 'var(--text-light)' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function destroyCharts() {
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+        }
+
+        // ==================== MAP ====================
+        let map = null;
+        function initializeMap(rides) {
+            // Only initialize on rides tab
+            const mapDiv = document.getElementById('rideMap');
+            if (!mapDiv || !mapDiv.offsetParent) return; // Don't initialize if hidden
+
+            try {
+                if (map) {
+                    map.remove();
+                }
+
+                // Default to Morocco center (Casablanca)
+                map = L.map('rideMap').setView([33.5731, -7.5898], 12);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add markers for rides
+                if (rides && rides.length > 0) {
+                    rides.forEach(ride => {
+                        if (ride.pickupLat && ride.pickupLng) {
+                            L.circleMarker([ride.pickupLat, ride.pickupLng], {
+                                color: '#D4AF37',
+                                radius: 8,
+                                weight: 2
+                            }).addTo(map)
+                            .bindPopup(`<b>${ride.passengerName}</b><br>${ride.pickupLocation}`);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing map:', error);
+            }
+        }
+
+        // ==================== SOCKET.IO ====================
+        function initializeSocket() {
+            if (!authToken) return;
+
+            try {
+                socket = io(SOCKET_URL, {
+                    auth: { token: authToken }
+                });
+
+                socket.on('connect', () => {
+                    console.log('Connected to real-time server');
+                });
+
+                socket.on('ride_update', (data) => {
+                    console.log('Ride update received:', data);
+                    if (document.getElementById('adminContainer').classList.contains('active')) {
+                        loadDashboardData();
+                    }
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('Disconnected from real-time server');
+                });
+            } catch (error) {
+                console.warn('Socket.IO connection failed (may not be available):', error.message);
+            }
+        }
+
+        // ==================== UTILITIES ====================
+        function scrollToSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function downloadApp() {
+            showToast('Redirecting to app store...', 'success');
+            // Implement app store redirect logic
+        }
+
+        function refreshData() {
+            if (authToken) {
+                loadDashboardData();
+                showToast('Data refreshed', 'success');
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideInRight 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

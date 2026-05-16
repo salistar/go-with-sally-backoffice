@@ -1,0 +1,17 @@
+{
+  "pickupLocation": {
+    "address": "Rue de la Liberté, Casablanca",
+    "latitude": 33.5731,
+    "longitude": -7.5898
+  },
+  "dropoffLocation": {
+    "address": "Avenue Hassan II, Rabat",
+    "latitude": 34.0209,
+    "longitude": -6.8416
+  },
+  "preferredTime": null,
+  "rideType": "economy",
+  "passengers": 1,
+  "notes": "Test ride request",
+  "insuranceRequired": false
+}

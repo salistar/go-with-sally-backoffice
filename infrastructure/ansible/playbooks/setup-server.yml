@@ -1,0 +1,420 @@
+---
+- name: Setup GoWithSally Servers
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    nodejs_version: "18.x"
+    docker_version: "latest"
+    python_version: "3.10"
+    nginx_version: "latest"
+    ufw_rules:
+      - { rule: 'allow', port: '22', proto: 'tcp' }
+      - { rule: 'allow', port: '80', proto: 'tcp' }
+      - { rule: 'allow', port: '443', proto: 'tcp' }
+      - { rule: 'allow', port: '3000', proto: 'tcp' }
+      - { rule: 'allow', port: '9090', proto: 'tcp' } # Prometheus
+      - { rule: 'allow', port: '3306', proto: 'tcp' } # MySQL (if needed)
+      - { rule: 'allow', port: '27017', proto: 'tcp' } # MongoDB
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade system packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+      when: ansible_os_family == "Debian"
+
+  tasks:
+    # System Dependencies
+    - name: Install system dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - net-tools
+          - build-essential
+          - libssl-dev
+          - libffi-dev
+          - python3-dev
+          - python3-pip
+          - python3-venv
+          - ufw
+          - fail2ban
+          - chrony
+          - jq
+          - unzip
+          - zip
+        state: present
+      when: ansible_os_family == "Debian"
+
+    # Docker Installation
+    - name: Add Docker repository key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add deploy user to docker group
+      user:
+        name: "{{ deploy_user }}"
+        groups: docker
+        append: yes
+      when: deploy_user != 'root'
+
+    # Docker Compose Installation (standalone)
+    - name: Install Docker Compose standalone
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+      args:
+        creates: /usr/local/bin/docker-compose
+
+    # Node.js Installation
+    - name: Add NodeSource repository key
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add NodeSource repository
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/node_{{ nodejs_version }} {{ ansible_distribution_release }} main"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Node.js
+      apt:
+        name:
+          - nodejs
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install npm packages globally
+      npm:
+        name: "{{ item }}"
+        global: yes
+      loop:
+        - pm2
+        - yarn
+        - typescript
+
+    # Nginx Installation
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Start and enable Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    # Python Setup
+    - name: Install Python packages
+      pip:
+        name:
+          - setuptools
+          - wheel
+          - boto3
+          - awscli
+          - prometheus-client
+          - pyyaml
+        state: present
+
+    # Create application user and directories
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        home: "{{ app_home }}"
+        createhome: yes
+        state: present
+
+    - name: Create application directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+      loop:
+        - "{{ app_dir }}"
+        - "{{ log_dir }}"
+        - "{{ backup_dir }}"
+        - "{{ app_home }}/.ssh"
+        - "{{ app_home }}/.pm2"
+
+    - name: Set proper permissions on app home
+      file:
+        path: "{{ app_home }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0750'
+        recurse: yes
+
+    # SSH Key Setup
+    - name: Create .ssh directory for deploy user
+      file:
+        path: "/home/{{ deploy_user }}/.ssh"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0700'
+
+    - name: Set authorized_keys file permissions
+      file:
+        path: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+        mode: '0600'
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+      when: deploy_user != 'root'
+
+    # Firewall Configuration (UFW)
+    - name: Set UFW logging
+      ufw:
+        logging: on
+
+    - name: Set UFW default policies
+      ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: 'incoming', policy: 'deny' }
+        - { direction: 'outgoing', policy: 'allow' }
+
+    - name: Configure firewall rules
+      ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+        state: enabled
+      loop: "{{ ufw_rules }}"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    # Fail2Ban Configuration
+    - name: Start and enable Fail2Ban
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    - name: Copy Fail2Ban local configuration
+      copy:
+        content: |
+          [DEFAULT]
+          bantime = 3600
+          findtime = 600
+          maxretry = 5
+
+          [sshd]
+          enabled = true
+          port = ssh
+          filter = sshd
+          logpath = /var/log/auth.log
+        dest: /etc/fail2ban/jail.local
+      notify: restart fail2ban
+
+    # Monitoring Tools
+    - name: Install Node Exporter (Prometheus monitoring)
+      shell: |
+        useradd --no-create-home --shell /bin/false node_exporter || true
+        cd /tmp
+        wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+        tar xvfz node_exporter-1.6.1.linux-amd64.tar.gz
+        cp node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
+        chown node_exporter:node_exporter /usr/local/bin/node_exporter
+        rm -rf node_exporter-1.6.1.linux-amd64*
+      args:
+        creates: /usr/local/bin/node_exporter
+
+    - name: Create Node Exporter systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User=node_exporter
+          Group=node_exporter
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/node_exporter.service
+      notify: reload systemd
+
+    - name: Enable and start Node Exporter
+      systemd:
+        name: node_exporter
+        state: started
+        enabled: yes
+
+    # Chrony NTP Configuration
+    - name: Start and enable Chrony
+      systemd:
+        name: chrony
+        state: started
+        enabled: yes
+
+    # Log rotation
+    - name: Create logrotate configuration for application logs
+      copy:
+        content: |
+          {{ log_dir }}/*.log {
+            daily
+            rotate 14
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ app_user }} {{ app_group }}
+            sharedscripts
+            postrotate
+              systemctl reload nginx > /dev/null 2>&1 || true
+            endscript
+          }
+        dest: /etc/logrotate.d/gowithsally
+
+    # Security hardening
+    - name: Harden SSH configuration
+      copy:
+        content: |
+          Port 22
+          AddressFamily any
+          ListenAddress 0.0.0.0
+          ListenAddress ::
+
+          HostKeys /etc/ssh/ssh_host_rsa_key
+          HostKeys /etc/ssh/ssh_host_ed25519_key
+
+          SyslogFacility AUTH
+          LogLevel INFO
+
+          PermitRootLogin no
+          StrictModes yes
+          MaxAuthTries 3
+          MaxSessions 10
+
+          PubkeyAuthentication yes
+          AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2
+
+          HostbasedAuthentication no
+          IgnoreRhosts yes
+          PermitEmptyPasswords no
+          PasswordAuthentication no
+          PermitUserEnvironment no
+
+          X11Forwarding no
+          X11UseLocalhost yes
+          PermitTTY yes
+
+          ClientAliveInterval 300
+          ClientAliveCountMax 2
+
+          AllowAgentForwarding no
+          AllowTcpForwarding no
+          PermitTunnel no
+
+          Banner /etc/ssh/banner.txt
+        dest: /etc/ssh/sshd_config
+        backup: yes
+      notify: restart sshd
+
+    - name: Create SSH banner
+      copy:
+        content: |
+          ========================================
+          Authorized Access Only
+          All activity is monitored and logged
+          ========================================
+        dest: /etc/ssh/banner.txt
+
+  handlers:
+    - name: restart fail2ban
+      systemd:
+        name: fail2ban
+        state: restarted
+
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+  post_tasks:
+    - name: Verify Docker installation
+      shell: docker --version
+      register: docker_version_output
+
+    - name: Display Docker version
+      debug:
+        msg: "{{ docker_version_output.stdout }}"
+
+    - name: Verify Node.js installation
+      shell: node --version
+      register: node_version_output
+
+    - name: Display Node.js version
+      debug:
+        msg: "{{ node_version_output.stdout }}"
+
+    - name: Create system report
+      shell: |
+        echo "=== GoWithSally Server Setup Report ===" > /tmp/setup-report.txt
+        echo "Hostname: $(hostname)" >> /tmp/setup-report.txt
+        echo "Kernel: $(uname -r)" >> /tmp/setup-report.txt
+        echo "Docker: $(docker --version)" >> /tmp/setup-report.txt
+        echo "Node.js: $(node --version)" >> /tmp/setup-report.txt
+        echo "Nginx: $(nginx -v 2>&1)" >> /tmp/setup-report.txt
+        echo "Python: $(python3 --version)" >> /tmp/setup-report.txt
+        echo "Setup completed at: $(date)" >> /tmp/setup-report.txt
+
+    - name: Fetch setup report
+      fetch:
+        src: /tmp/setup-report.txt
+        dest: ./setup-report-{{ inventory_hostname }}.txt
+        flat: yes

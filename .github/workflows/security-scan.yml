@@ -1,0 +1,379 @@
+###############################################################################
+# GoWithSally Security Scanning Pipeline
+# npm audit, Snyk security scanning, and dependency checks
+#
+# Triggers:
+#   - Push to main, staging, develop branches
+#   - Pull requests to main and staging branches
+#   - Weekly schedule
+#   - Manual workflow dispatch
+#
+# Logging:
+#   All security scan results logged to GitHub Actions
+#   Vulnerabilities reported as issues
+#
+###############################################################################
+
+name: Security Scan
+
+on:
+  push:
+    branches: [main, staging, develop]
+  pull_request:
+    branches: [main, staging]
+  schedule:
+    - cron: '0 2 * * 0' # Weekly on Sunday at 2 AM UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  ###############################################################################
+  # Backend Dependency Audit
+  ###############################################################################
+
+  audit-backend:
+    name: Backend npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: gowithsally-backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: gowithsally-backend
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing backend dependencies..."
+          npm ci
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies installed"
+
+      - name: Run npm audit
+        working-directory: gowithsally-backend
+        id: audit
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running npm audit..."
+          npm audit --audit-level=moderate || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] npm audit completed"
+
+      - name: Generate audit report
+        working-directory: gowithsally-backend
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating detailed audit report..."
+          npm audit --json > audit-report.json || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Audit report generated"
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-audit-report
+          path: gowithsally-backend/audit-report.json
+          retention-days: 90
+        continue-on-error: true
+
+  ###############################################################################
+  # Mobile Dependency Audit
+  ###############################################################################
+
+  audit-mobile:
+    name: Mobile npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: gowithsally-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: gowithsally-mobile
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing mobile dependencies..."
+          npm ci
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies installed"
+
+      - name: Run npm audit
+        working-directory: gowithsally-mobile
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running npm audit..."
+          npm audit --audit-level=moderate || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] npm audit completed"
+
+      - name: Generate audit report
+        working-directory: gowithsally-mobile
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating detailed audit report..."
+          npm audit --json > audit-report.json || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Audit report generated"
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-audit-report
+          path: gowithsally-mobile/audit-report.json
+          retention-days: 90
+        continue-on-error: true
+
+  ###############################################################################
+  # Face API Python Dependency Check
+  ###############################################################################
+
+  audit-faceapi:
+    name: Face API Python dependency check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: gowithsally-face-api
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing Python dependencies..."
+          python -m pip install --upgrade pip
+          pip install safety || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dependencies installed"
+
+      - name: Check requirements.txt
+        working-directory: gowithsally-face-api
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Checking requirements.txt..."
+          if [[ -f "requirements.txt" ]]; then
+            pip install -r requirements.txt || true
+            safety check --json > safety-report.json || true
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Safety check completed"
+          else
+            echo "requirements.txt not found"
+          fi
+
+      - name: Upload Python safety report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: faceapi-safety-report
+          path: gowithsally-face-api/safety-report.json
+          retention-days: 90
+        continue-on-error: true
+
+  ###############################################################################
+  # Snyk Security Scanning
+  ###############################################################################
+
+  snyk-security:
+    name: Snyk Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: vars.SNYK_TOKEN != ''
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Snyk
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Installing Snyk..."
+          npm install -g snyk
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Snyk installed"
+
+      - name: Snyk auth
+        run: snyk auth "${{ secrets.SNYK_TOKEN }}"
+        continue-on-error: true
+
+      - name: Snyk scan backend
+        working-directory: gowithsally-backend
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running Snyk scan on backend..."
+          npm ci
+          snyk test --severity-threshold=high || true
+          snyk test --json > snyk-report.json || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backend Snyk scan completed"
+        continue-on-error: true
+
+      - name: Snyk scan mobile
+        working-directory: gowithsally-mobile
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running Snyk scan on mobile..."
+          npm ci
+          snyk test --severity-threshold=high || true
+          snyk test --json > snyk-report.json || true
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Mobile Snyk scan completed"
+        continue-on-error: true
+
+      - name: Upload Snyk reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-reports
+          path: '*/snyk-report.json'
+          retention-days: 90
+        continue-on-error: true
+
+  ###############################################################################
+  # Dependency Vulnerability Check
+  ###############################################################################
+
+  check-vulnerabilities:
+    name: Check Vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [audit-backend, audit-mobile, audit-faceapi]
+    if: always()
+
+    steps:
+      - name: Download all audit reports
+        uses: actions/download-artifact@v4
+
+      - name: Check for critical vulnerabilities
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Checking for critical vulnerabilities..."
+
+          has_critical=false
+
+          # Check backend audit report
+          if [[ -f "backend-audit-report/audit-report.json" ]]; then
+            critical_count=$(jq '[.vulnerabilities[] | select(.severity=="critical")] | length' backend-audit-report/audit-report.json)
+            if [[ $critical_count -gt 0 ]]; then
+              echo "CRITICAL: Found $critical_count critical vulnerabilities in backend"
+              has_critical=true
+            fi
+          fi
+
+          # Check mobile audit report
+          if [[ -f "mobile-audit-report/audit-report.json" ]]; then
+            critical_count=$(jq '[.vulnerabilities[] | select(.severity=="critical")] | length' mobile-audit-report/audit-report.json)
+            if [[ $critical_count -gt 0 ]]; then
+              echo "CRITICAL: Found $critical_count critical vulnerabilities in mobile"
+              has_critical=true
+            fi
+          fi
+
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Vulnerability check completed"
+
+          if [[ "$has_critical" == "true" ]]; then
+            echo "Critical vulnerabilities detected"
+            exit 1
+          fi
+
+      - name: Generate summary report
+        if: always()
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Generating summary report..."
+
+          cat > security-summary.txt <<'EOF'
+Security Scan Summary
+=====================
+
+Scan Date: $(date '+%Y-%m-%d %H:%M:%S')
+
+Scans Performed:
+  - npm audit (backend)
+  - npm audit (mobile)
+  - Python safety check (face-api)
+  - Snyk security scan
+
+Artifact Locations:
+  - Backend: backend-audit-report/
+  - Mobile: mobile-audit-report/
+  - Face API: faceapi-safety-report/
+  - Snyk: snyk-reports/
+
+Next Steps:
+  1. Review detailed reports in artifacts
+  2. Address critical vulnerabilities immediately
+  3. Schedule fixes for high-severity issues
+  4. Document any accepted risks
+
+For more information:
+  - GitHub Security Documentation: https://docs.github.com/en/code-security
+  - npm audit: https://docs.npmjs.com/cli/v9/commands/npm-audit
+  - Snyk: https://snyk.io/docs/
+
+EOF
+
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Summary report generated"
+
+      - name: Upload security summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.txt
+          retention-days: 90
+        continue-on-error: true
+
+  ###############################################################################
+  # Notify on Issues
+  ###############################################################################
+
+  notify:
+    name: Notify Security Issues
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [check-vulnerabilities]
+
+    steps:
+      - name: Determine result
+        id: result
+        run: |
+          if [[ "${{ needs.check-vulnerabilities.result }}" == "failure" ]]; then
+            echo "status=VULNERABILITIES_FOUND" >> $GITHUB_OUTPUT
+          else
+            echo "status=PASSED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: vars.SLACK_WEBHOOK != '' && steps.result.outputs.status == 'VULNERABILITIES_FOUND'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Security Scan: VULNERABILITIES FOUND",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Security Scan Alert*\nStatus: VULNERABILITIES DETECTED\nRef: ${{ github.ref }}\nAction: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
+
+      - name: Log completion
+        run: |
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Security scan completed with status: ${{ steps.result.outputs.status }}"

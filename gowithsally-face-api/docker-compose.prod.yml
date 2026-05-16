@@ -1,0 +1,91 @@
+# ==============================================================================
+# GO WITH SALLY - Face AI Studio v4.0 - Production Override
+# ==============================================================================
+#
+# USAGE:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --scale api=3
+#
+# ==============================================================================
+
+services:
+
+  # --- API (production mode) --------------------------------------------------
+  api:
+    # Remove dev command -> uses Dockerfile CMD (gunicorn)
+    command: ""
+    container_name: ""
+
+    environment:
+      - APP_ENV=production
+      - WORKERS=2
+      - LOG_LEVEL=warning
+      - REDIS_URL=redis://redis:6379/0
+
+    # Don't mount source in prod
+    volumes:
+      - ./models:/app/models:ro
+
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+        reservations:
+          memory: 1G
+          cpus: "0.5"
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+
+  # --- Nginx (load balancer) --------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: sally-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - sally-net
+
+  # --- Prometheus (monitoring) ------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sally-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./nginx/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks:
+      - sally-net
+
+  # --- Grafana (dashboards) ---------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sally-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=sally2024
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - sally-net
+
+
+volumes:
+  prometheus-data:
+  grafana-data:

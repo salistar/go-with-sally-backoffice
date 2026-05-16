@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: gowithsally-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://gowithsally_admin:sally_secure_2024@mongodb:27017/gowithsally?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: sally_redis_2024
+      FACE_API_URL: http://face-api:8000
+    ports:
+      - "${PORT:-5000}:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - gowithsally-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mongodb:
+    image: mongo:7.0
+    container_name: gowithsally-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: gowithsally_admin
+      MONGO_INITDB_ROOT_PASSWORD: sally_secure_2024
+      MONGO_INITDB_DATABASE: gowithsally
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ../gowithsally-database/scripts:/docker-entrypoint-initdb.d
+    networks:
+      - gowithsally-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: gowithsally-redis
+    restart: unless-stopped
+    command: redis-server --requirepass sally_redis_2024 --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gowithsally-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "sally_redis_2024", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  gowithsally-network:
+    driver: bridge
+    name: gowithsally-network

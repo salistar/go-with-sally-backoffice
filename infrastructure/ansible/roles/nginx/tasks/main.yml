@@ -1,0 +1,326 @@
+---
+- name: Ensure Nginx is installed
+  apt:
+    name: nginx
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure Nginx is started and enabled
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Create Nginx configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/nginx/conf.d
+    - /etc/nginx/sites-available
+    - /etc/nginx/sites-enabled
+    - /etc/nginx/snippets
+
+- name: Create SSL directory for certificates
+  file:
+    path: /etc/nginx/ssl
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Create Nginx main configuration
+  copy:
+    content: |
+      user www-data;
+      worker_processes auto;
+      pid /run/nginx.pid;
+      error_log /var/log/nginx/error.log warn;
+
+      events {
+        worker_connections 4096;
+        use epoll;
+        multi_accept on;
+      }
+
+      http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'rt=$request_time uct="$upstream_connect_time" '
+                        'uht="$upstream_header_time" urt="$upstream_response_time"';
+
+        access_log /var/log/nginx/access.log main buffer=256k flush=5s;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 100M;
+
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml;
+        gzip_disable "msie6";
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+
+        # Rate limiting zones
+        limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=api:10m rate=100r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/m;
+
+        # SSL parameters
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # OCSP stapling
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        ssl_trusted_certificate /etc/nginx/ssl/ca-cert.pem;
+
+        # Upstreams
+        upstream app_backend {
+          least_conn;
+          server gowithsally-app:3000 max_fails=3 fail_timeout=30s;
+          server gowithsally-app:3001 max_fails=3 fail_timeout=30s backup;
+          keepalive 32;
+        }
+
+        upstream api_backend {
+          least_conn;
+          server gowithsally-api:3000 max_fails=3 fail_timeout=30s;
+          server gowithsally-api:3001 max_fails=3 fail_timeout=30s backup;
+          keepalive 32;
+        }
+
+        # Include additional configurations
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
+      }
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Create GoWithSally web server configuration
+  copy:
+    content: |
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name gowithsally.ma www.gowithsally.ma;
+
+        # Redirect HTTP to HTTPS
+        return 301 https://$server_name$request_uri;
+      }
+
+      server {
+        listen 443 ssl http2;
+        listen [::]:443 ssl http2;
+        server_name gowithsally.ma www.gowithsally.ma;
+
+        # SSL certificates (replace with actual paths)
+        ssl_certificate /etc/nginx/ssl/gowithsally.ma.crt;
+        ssl_certificate_key /etc/nginx/ssl/gowithsally.ma.key;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+
+        # Rate limiting
+        limit_req zone=general burst=20 nodelay;
+
+        # Compression
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss;
+
+        root /var/www/gowithsally/web;
+        index index.html;
+
+        # Static files caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+          expires 30d;
+          add_header Cache-Control "public, immutable";
+          access_log off;
+        }
+
+        # Health check endpoint
+        location /health {
+          access_log off;
+          return 200 "healthy\n";
+          add_header Content-Type text/plain;
+        }
+
+        # API reverse proxy
+        location /api/ {
+          limit_req zone=api burst=50 nodelay;
+          proxy_pass http://api_backend/;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_buffering off;
+          proxy_request_buffering off;
+          proxy_connect_timeout 30s;
+          proxy_send_timeout 30s;
+          proxy_read_timeout 30s;
+        }
+
+        # Web app reverse proxy
+        location / {
+          proxy_pass http://app_backend;
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_buffering off;
+          proxy_request_buffering off;
+          proxy_connect_timeout 30s;
+          proxy_send_timeout 30s;
+          proxy_read_timeout 30s;
+
+          # SPA fallback
+          error_page 404 /index.html;
+          if (!-e $request_filename) {
+            rewrite ^(.*)$ /index.html break;
+          }
+        }
+
+        # Deny access to sensitive files
+        location ~ /\. {
+          deny all;
+          access_log off;
+          log_not_found off;
+        }
+
+        location ~ /\.env {
+          deny all;
+          access_log off;
+          log_not_found off;
+        }
+
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+          root /usr/share/nginx/html;
+        }
+      }
+    dest: /etc/nginx/sites-available/gowithsally.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable GoWithSally site configuration
+  file:
+    src: /etc/nginx/sites-available/gowithsally.conf
+    dest: /etc/nginx/sites-enabled/gowithsally.conf
+    state: link
+    owner: root
+    group: root
+  notify: reload nginx
+
+- name: Disable default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Test Nginx configuration
+  shell: nginx -t
+  register: nginx_test
+  changed_when: false
+  failed_when: nginx_test.rc != 0
+
+- name: Create Nginx status page configuration
+  copy:
+    content: |
+      server {
+        listen 127.0.0.1:8080;
+        server_name localhost;
+
+        location /nginx_status {
+          stub_status on;
+          access_log off;
+          allow 127.0.0.1;
+          allow ::1;
+          deny all;
+        }
+      }
+    dest: /etc/nginx/conf.d/status.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Create Nginx log rotation configuration
+  copy:
+    content: |
+      /var/log/nginx/*.log {
+        daily
+        rotate 14
+        compress
+        delaycompress
+        notifempty
+        create 0640 www-data adm
+        sharedscripts
+        prerotate
+          if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+            run-parts /etc/logrotate.d/httpd-prerotate; \
+          fi
+        endscript
+        postrotate
+          [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
+        endscript
+      }
+    dest: /etc/logrotate.d/nginx
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure Nginx is running
+  systemd:
+    name: nginx
+    state: started
+
+- name: Verify Nginx is responding
+  uri:
+    url: "http://localhost:8080/nginx_status"
+    status_code: 200
+  register: nginx_status
+  changed_when: false
+  retries: 5
+  delay: 2
+
+- name: Display Nginx installation summary
+  debug:
+    msg:
+      - "Nginx installation verified"
+      - "Configuration test: PASSED"
+      - "Service status: running"
+      - "Sites enabled: gowithsally.conf"
+      - "Status page: http://127.0.0.1:8080/nginx_status"

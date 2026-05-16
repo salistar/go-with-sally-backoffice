@@ -1,0 +1,220 @@
+---
+# ============================================================================
+# Docker Installation & Configuration
+# ============================================================================
+
+- name: Install Docker dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  when: ansible_os_family == "Debian"
+  retries: 3
+  delay: 10
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_machine == 'x86_64' else 'arm64' }}] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker-ce
+  when: ansible_os_family == "Debian"
+
+- name: Install Docker CE packages
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  retries: 3
+  delay: 10
+
+- name: Verify Docker is installed
+  shell: docker --version
+  register: docker_version
+  changed_when: false
+  failed_when: docker_version.rc != 0
+
+- name: Display Docker version
+  debug:
+    msg: "Docker installed: {{ docker_version.stdout }}"
+
+- name: Ensure Docker service is running
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Verify Docker socket is accessible
+  stat:
+    path: /var/run/docker.sock
+  register: docker_socket
+
+- name: Verify Docker daemon is responsive
+  shell: docker ps -q
+  register: docker_ps
+  changed_when: false
+  retries: 5
+  delay: 5
+
+- name: Create docker group
+  group:
+    name: docker
+    state: present
+
+- name: Ensure deploy user is in docker group
+  user:
+    name: "{{ deploy_user | default('ubuntu') }}"
+    groups: docker
+    append: yes
+  when: deploy_user | default('ubuntu') != 'root'
+
+- name: Verify docker-compose is installed
+  shell: docker-compose --version
+  register: compose_version
+  changed_when: false
+  failed_when: compose_version.rc != 0
+
+- name: Display docker-compose version
+  debug:
+    msg: "Docker Compose installed: {{ compose_version.stdout }}"
+
+- name: Setup Docker daemon configuration
+  copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "metrics-addr": "127.0.0.1:9323",
+        "experimental": true,
+        "storage-driver": "overlay2",
+        "live-restore": true,
+        "userland-proxy": false,
+        "insecure-registries": [],
+        "seccomp-profile": "/etc/docker/seccomp.json"
+      }
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart docker
+
+- name: Create Docker seccomp profile
+  copy:
+    content: |
+      {
+        "defaultAction": "SCMP_ACT_ALLOW",
+        "defaultErrnoRet": "EACCES",
+        "archMap": [
+          {
+            "architecture": "SCMP_ARCH_X86_64",
+            "subArchitectures": [
+              "SCMP_ARCH_X86",
+              "SCMP_ARCH_X32"
+            ]
+          }
+        ]
+      }
+    dest: /etc/docker/seccomp.json
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Test Docker functionality
+  shell: docker run --rm hello-world > /dev/null 2>&1
+  register: docker_test
+  changed_when: false
+  timeout: 60
+  retries: 3
+  delay: 10
+  until: docker_test is succeeded
+
+- name: Create Docker network for GoWithSally
+  docker_network:
+    name: gowithsally-network
+    driver: bridge
+    state: present
+
+- name: Configure Docker container cleanup
+  cron:
+    name: "Docker cleanup (remove exited containers)"
+    minute: "0"
+    hour: "3"
+    job: "docker container prune -f --filter 'until=72h' >> /var/log/docker-cleanup.log 2>&1"
+    user: root
+
+- name: Configure Docker image cleanup
+  cron:
+    name: "Docker image cleanup (remove dangling images)"
+    minute: "30"
+    hour: "3"
+    job: "docker image prune -f --filter 'dangling=true' >> /var/log/docker-cleanup.log 2>&1"
+    user: root
+
+- name: Configure Docker volume cleanup
+  cron:
+    name: "Docker volume cleanup (remove unused volumes)"
+    minute: "0"
+    hour: "4"
+    job: "docker volume prune -f --filter 'label!=keep' >> /var/log/docker-cleanup.log 2>&1"
+    user: root
+
+- name: Setup Docker log rotation
+  copy:
+    content: |
+      /var/lib/docker/containers/*/*.log {
+        rotate 5
+        copytruncate
+        daily
+        maxsize 100M
+        delaycompress
+        compress
+        notifempty
+      }
+    dest: /etc/logrotate.d/docker-containers
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Verify Docker networking
+  shell: docker network ls | grep gowithsally-network
+  register: network_check
+  changed_when: false
+  failed_when: network_check.rc != 0
+
+- name: Create Docker credential file
+  file:
+    path: "~/.docker"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0700'
+  when: deploy_user != 'root'
+
+- name: Display Docker installation summary
+  debug:
+    msg:
+      - "Docker installation verified"
+      - "Docker version: {{ docker_version.stdout }}"
+      - "Docker Compose version: {{ compose_version.stdout }}"
+      - "Docker network: gowithsally-network"
+      - "Docker socket: /var/run/docker.sock"

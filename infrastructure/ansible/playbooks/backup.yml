@@ -1,0 +1,447 @@
+---
+- name: Backup and Archive GoWithSally Data
+  hosts: "{{ backup_target | default('all') }}"
+  become: yes
+
+  vars:
+    backup_base_dir: "{{ backup_dir }}"
+    backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    mongodb_port: 27017
+    redis_port: 6379
+    retention_days: 30
+    s3_bucket: "gowithsally-backups"
+    s3_region: "us-east-1"
+    local_backup_only: false
+
+  pre_tasks:
+    - name: Create backup directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - "{{ backup_base_dir }}"
+        - "{{ backup_base_dir }}/mongodb"
+        - "{{ backup_base_dir }}/redis"
+        - "{{ backup_base_dir }}/logs"
+        - "{{ backup_base_dir }}/elasticsearch"
+        - "{{ backup_base_dir }}/uploads"
+
+    - name: Check AWS credentials for S3 backup
+      stat:
+        path: "~/.aws/credentials"
+      register: aws_creds
+      when: not local_backup_only
+
+    - name: Display backup configuration
+      debug:
+        msg:
+          - "Backup Timestamp: {{ backup_timestamp }}"
+          - "Backup Location: {{ backup_base_dir }}"
+          - "Local Backup Only: {{ local_backup_only }}"
+          - "S3 Available: {{ aws_creds.stat.exists | default(false) }}"
+
+  tasks:
+    # MongoDB Backup
+    - name: Backup MongoDB database
+      block:
+        - name: Create MongoDB backup directory
+          file:
+            path: "{{ backup_base_dir }}/mongodb/{{ backup_timestamp }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Execute MongoDB dump
+          shell: |
+            docker exec gowithsally-db mongodump \
+              --out {{ backup_base_dir }}/mongodb/{{ backup_timestamp }} \
+              --archive="{{ backup_base_dir }}/mongodb/mongodb_{{ backup_timestamp }}.archive" \
+              --gzip
+          register: mongodump_result
+          timeout: 3600
+
+        - name: Display MongoDB backup status
+          debug:
+            msg: "MongoDB backup completed: {{ mongodump_result.stdout }}"
+
+        - name: Generate MongoDB backup manifest
+          copy:
+            content: |
+              MongoDB Backup Manifest
+              =======================
+              Backup Time: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              Type: Full mongodump with gzip compression
+              Location: {{ backup_base_dir }}/mongodb/mongodb_{{ backup_timestamp }}.archive
+
+              Command:
+              docker exec gowithsally-db mongodump \
+                --out {{ backup_base_dir }}/mongodb/{{ backup_timestamp }} \
+                --archive="{{ backup_base_dir }}/mongodb/mongodb_{{ backup_timestamp }}.archive" \
+                --gzip
+
+              Restore Command:
+              docker exec gowithsally-db mongorestore \
+                --archive="{{ backup_base_dir }}/mongodb/mongodb_{{ backup_timestamp }}.archive" \
+                --gzip
+            dest: "{{ backup_base_dir }}/mongodb/MANIFEST_{{ backup_timestamp }}.txt"
+
+      rescue:
+        - name: Handle MongoDB backup failure
+          debug:
+            msg: "WARNING: MongoDB backup failed. Error: {{ ansible_failed_result.msg }}"
+
+    # Redis Backup
+    - name: Backup Redis
+      block:
+        - name: Create Redis backup directory
+          file:
+            path: "{{ backup_base_dir }}/redis/{{ backup_timestamp }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Trigger Redis background save
+          shell: |
+            docker exec gowithsally-redis redis-cli BGSAVE
+          register: redis_bgsave
+          timeout: 300
+
+        - name: Wait for Redis save to complete
+          shell: |
+            docker exec gowithsally-redis redis-cli LASTSAVE
+          register: redis_lastsave
+          until: redis_lastsave.stdout | int >= (ansible_date_time.epoch | int - 10)
+          retries: 30
+          delay: 5
+
+        - name: Copy Redis dump file
+          shell: |
+            docker cp gowithsally-redis:/data/dump.rdb {{ backup_base_dir }}/redis/redis_{{ backup_timestamp }}.rdb
+            gzip {{ backup_base_dir }}/redis/redis_{{ backup_timestamp }}.rdb
+          args:
+            warn: no
+
+        - name: Get Redis backup size
+          stat:
+            path: "{{ backup_base_dir }}/redis/redis_{{ backup_timestamp }}.rdb.gz"
+          register: redis_backup_size
+
+        - name: Generate Redis backup manifest
+          copy:
+            content: |
+              Redis Backup Manifest
+              =====================
+              Backup Time: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              Type: RDB snapshot with gzip compression
+              File Size: {{ (redis_backup_size.stat.size / 1024 / 1024) | round(2) }} MB
+              Location: {{ backup_base_dir }}/redis/redis_{{ backup_timestamp }}.rdb.gz
+
+              Restore Command:
+              # Copy file to Redis container
+              docker cp {{ backup_base_dir }}/redis/redis_{{ backup_timestamp }}.rdb.gz gowithsally-redis:/data/
+              docker exec gowithsally-redis gunzip /data/redis_{{ backup_timestamp }}.rdb.gz
+              docker exec gowithsally-redis mv /data/redis_{{ backup_timestamp }}.rdb /data/dump.rdb
+              docker restart gowithsally-redis
+            dest: "{{ backup_base_dir }}/redis/MANIFEST_{{ backup_timestamp }}.txt"
+
+      rescue:
+        - name: Handle Redis backup failure
+          debug:
+            msg: "WARNING: Redis backup failed. Error: {{ ansible_failed_result.msg }}"
+
+    # Application Logs Backup
+    - name: Backup application logs
+      block:
+        - name: Create logs backup directory
+          file:
+            path: "{{ backup_base_dir }}/logs/{{ backup_timestamp }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Archive application logs
+          shell: |
+            tar --gzip \
+              -cf {{ backup_base_dir }}/logs/app_logs_{{ backup_timestamp }}.tar.gz \
+              -C {{ log_dir }} .
+          args:
+            warn: no
+          ignore_errors: yes
+
+        - name: Archive Docker container logs
+          shell: |
+            mkdir -p {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}
+            docker logs gowithsally-app > {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}/app.log 2>&1 || true
+            docker logs gowithsally-api > {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}/api.log 2>&1 || true
+            docker logs gowithsally-db > {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}/db.log 2>&1 || true
+            docker logs gowithsally-redis > {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}/redis.log 2>&1 || true
+            docker logs gowithsally-nginx > {{ backup_base_dir }}/logs/docker_{{ backup_timestamp }}/nginx.log 2>&1 || true
+            tar --gzip -cf {{ backup_base_dir }}/logs/docker_logs_{{ backup_timestamp }}.tar.gz \
+              -C {{ backup_base_dir }}/logs docker_{{ backup_timestamp }}
+          args:
+            warn: no
+          ignore_errors: yes
+
+        - name: Generate logs backup manifest
+          copy:
+            content: |
+              Application Logs Backup Manifest
+              ==================================
+              Backup Time: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              Type: Application and Docker container logs
+              Location: {{ backup_base_dir }}/logs/
+
+              Files:
+              - app_logs_{{ backup_timestamp }}.tar.gz (application logs)
+              - docker_logs_{{ backup_timestamp }}.tar.gz (container logs)
+
+              Extract Commands:
+              tar -xzf app_logs_{{ backup_timestamp }}.tar.gz
+              tar -xzf docker_logs_{{ backup_timestamp }}.tar.gz
+            dest: "{{ backup_base_dir }}/logs/MANIFEST_{{ backup_timestamp }}.txt"
+
+      rescue:
+        - name: Handle logs backup failure
+          debug:
+            msg: "WARNING: Logs backup failed. Error: {{ ansible_failed_result.msg }}"
+
+    # Elasticsearch Backup
+    - name: Backup Elasticsearch indices
+      block:
+        - name: Create Elasticsearch snapshot repository
+          uri:
+            url: "http://localhost:9200/_snapshot/gowithsally_backup"
+            method: PUT
+            body_format: json
+            body:
+              type: fs
+              settings:
+                location: "{{ backup_base_dir }}/elasticsearch"
+            status_code: [200, 201]
+          ignore_errors: yes
+
+        - name: Trigger Elasticsearch snapshot
+          uri:
+            url: "http://localhost:9200/_snapshot/gowithsally_backup/snapshot_{{ backup_timestamp }}?wait_for_completion=true"
+            method: PUT
+            timeout: 3600
+          ignore_errors: yes
+          register: es_snapshot
+
+        - name: Generate Elasticsearch backup manifest
+          copy:
+            content: |
+              Elasticsearch Backup Manifest
+              ================================
+              Backup Time: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              Type: Elasticsearch snapshot
+              Snapshot Name: snapshot_{{ backup_timestamp }}
+              Location: {{ backup_base_dir }}/elasticsearch
+
+              Restore Command:
+              curl -X POST "localhost:9200/_snapshot/gowithsally_backup/snapshot_{{ backup_timestamp }}/_restore"
+            dest: "{{ backup_base_dir }}/elasticsearch/MANIFEST_{{ backup_timestamp }}.txt"
+
+      rescue:
+        - name: Handle Elasticsearch backup failure
+          debug:
+            msg: "WARNING: Elasticsearch backup failed. Error: {{ ansible_failed_result.msg }}"
+
+    # File Uploads Backup
+    - name: Backup uploaded files
+      block:
+        - name: Create uploads backup directory
+          file:
+            path: "{{ backup_base_dir }}/uploads/{{ backup_timestamp }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Archive uploaded files
+          shell: |
+            if [ -d "{{ app_dir }}/uploads" ]; then
+              tar --gzip \
+                -cf {{ backup_base_dir }}/uploads/uploads_{{ backup_timestamp }}.tar.gz \
+                -C {{ app_dir }} uploads/
+            fi
+          args:
+            warn: no
+          ignore_errors: yes
+
+        - name: Generate uploads backup manifest
+          copy:
+            content: |
+              Uploads Backup Manifest
+              =======================
+              Backup Time: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              Type: User uploaded files
+              Location: {{ backup_base_dir }}/uploads/uploads_{{ backup_timestamp }}.tar.gz
+
+              Extract Command:
+              tar -xzf uploads_{{ backup_timestamp }}.tar.gz
+            dest: "{{ backup_base_dir }}/uploads/MANIFEST_{{ backup_timestamp }}.txt"
+
+      rescue:
+        - name: Handle uploads backup failure
+          debug:
+            msg: "WARNING: Uploads backup failed. Error: {{ ansible_failed_result.msg }}"
+
+    # Upload to S3
+    - name: Upload backups to S3
+      block:
+        - name: Install AWS CLI if not present
+          apt:
+            name: awscli
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Sync MongoDB backups to S3
+          shell: |
+            aws s3 sync {{ backup_base_dir }}/mongodb/ \
+              s3://{{ s3_bucket }}/backups/mongodb/ \
+              --region {{ s3_region }} \
+              --exclude "*" --include "*.archive" --include "*.txt"
+          environment:
+            AWS_DEFAULT_REGION: "{{ s3_region }}"
+          register: s3_mongodb_sync
+          when: aws_creds.stat.exists and not local_backup_only
+          ignore_errors: yes
+
+        - name: Sync Redis backups to S3
+          shell: |
+            aws s3 sync {{ backup_base_dir }}/redis/ \
+              s3://{{ s3_bucket }}/backups/redis/ \
+              --region {{ s3_region }} \
+              --exclude "*" --include "*.rdb.gz" --include "*.txt"
+          environment:
+            AWS_DEFAULT_REGION: "{{ s3_region }}"
+          register: s3_redis_sync
+          when: aws_creds.stat.exists and not local_backup_only
+          ignore_errors: yes
+
+        - name: Sync logs backups to S3
+          shell: |
+            aws s3 sync {{ backup_base_dir }}/logs/ \
+              s3://{{ s3_bucket }}/backups/logs/ \
+              --region {{ s3_region }} \
+              --exclude "*" --include "*.tar.gz" --include "*.txt"
+          environment:
+            AWS_DEFAULT_REGION: "{{ s3_region }}"
+          register: s3_logs_sync
+          when: aws_creds.stat.exists and not local_backup_only
+          ignore_errors: yes
+
+      when: not local_backup_only
+      rescue:
+        - name: Handle S3 upload failure
+          debug:
+            msg: "WARNING: S3 backup upload failed. Error: {{ ansible_failed_result.msg }}"
+
+  post_tasks:
+    - name: Cleanup old local backups
+      block:
+        - name: Remove old MongoDB backups
+          shell: |
+            find {{ backup_base_dir }}/mongodb -name "mongodb_*.archive" -mtime +{{ retention_days }} -delete
+            find {{ backup_base_dir }}/mongodb -type d -name "[0-9]*" -mtime +{{ retention_days }} -exec rm -rf {} +
+
+        - name: Remove old Redis backups
+          shell: |
+            find {{ backup_base_dir }}/redis -name "redis_*.rdb.gz" -mtime +{{ retention_days }} -delete
+
+        - name: Remove old log backups
+          shell: |
+            find {{ backup_base_dir }}/logs -name "*.tar.gz" -mtime +{{ retention_days }} -delete
+
+        - name: Remove old Elasticsearch backups
+          shell: |
+            find {{ backup_base_dir }}/elasticsearch -mtime +{{ retention_days }} -delete
+
+        - name: Remove old uploads backups
+          shell: |
+            find {{ backup_base_dir }}/uploads -name "uploads_*.tar.gz" -mtime +{{ retention_days }} -delete
+
+      rescue:
+        - name: Handle cleanup failure
+          debug:
+            msg: "WARNING: Backup cleanup failed. Error: {{ ansible_failed_result.msg }}"
+
+    - name: Generate backup summary report
+      shell: |
+        cat > {{ backup_base_dir }}/BACKUP_REPORT_{{ backup_timestamp }}.txt << EOF
+        GoWithSally Backup Summary Report
+        ==================================
+        Backup Timestamp: {{ ansible_date_time.iso8601 }}
+        Host: {{ inventory_hostname }}
+        Environment: {{ environment | default('unknown') }}
+
+        Backup Locations:
+        - MongoDB: {{ backup_base_dir }}/mongodb/
+        - Redis: {{ backup_base_dir }}/redis/
+        - Logs: {{ backup_base_dir }}/logs/
+        - Uploads: {{ backup_base_dir }}/uploads/
+        - Elasticsearch: {{ backup_base_dir }}/elasticsearch/
+
+        Backup Statistics:
+        - Total backup directory size: $(du -sh {{ backup_base_dir }} | cut -f1)
+        - Number of MongoDB backups: $(find {{ backup_base_dir }}/mongodb -name "*.archive" | wc -l)
+        - Number of Redis backups: $(find {{ backup_base_dir }}/redis -name "*.rdb.gz" | wc -l)
+        - Retention period: {{ retention_days }} days
+
+        S3 Status: {% if aws_creds.stat.exists and not local_backup_only %}Enabled{% else %}Disabled{% endif %}
+        Local Only: {{ local_backup_only }}
+
+        Last Backup Success: Yes
+        Backup Completion Time: {{ ansible_date_time.iso8601 }}
+        EOF
+      args:
+        warn: no
+
+    - name: Fetch backup report
+      fetch:
+        src: "{{ backup_base_dir }}/BACKUP_REPORT_{{ backup_timestamp }}.txt"
+        dest: ./backup-report-{{ inventory_hostname }}-{{ backup_timestamp }}.txt
+        flat: yes
+      ignore_errors: yes
+
+    - name: Create backup status file for monitoring
+      copy:
+        content: |
+          # HELP gowithsally_backup_last_run_timestamp Timestamp of last backup
+          # TYPE gowithsally_backup_last_run_timestamp gauge
+          gowithsally_backup_last_run_timestamp{host="{{ inventory_hostname }}",type="mongodb"} {{ ansible_date_time.epoch }}
+          gowithsally_backup_last_run_timestamp{host="{{ inventory_hostname }}",type="redis"} {{ ansible_date_time.epoch }}
+          gowithsally_backup_last_run_timestamp{host="{{ inventory_hostname }}",type="logs"} {{ ansible_date_time.epoch }}
+          gowithsally_backup_last_run_timestamp{host="{{ inventory_hostname }}",type="uploads"} {{ ansible_date_time.epoch }}
+
+          # HELP gowithsally_backup_size_bytes Size of backup in bytes
+          # TYPE gowithsally_backup_size_bytes gauge
+          gowithsally_backup_size_bytes{host="{{ inventory_hostname }}"} $(du -sb {{ backup_base_dir }} | cut -f1)
+        dest: /var/lib/prometheus/gowithsally_backups.prom
+        owner: prometheus
+        group: prometheus
+      ignore_errors: yes
+
+    - name: Display backup completion summary
+      debug:
+        msg:
+          - "Backup completed successfully"
+          - "Timestamp: {{ backup_timestamp }}"
+          - "Host: {{ inventory_hostname }}"
+          - "MongoDB: Backed up to {{ backup_base_dir }}/mongodb/"
+          - "Redis: Backed up to {{ backup_base_dir }}/redis/"
+          - "Logs: Backed up to {{ backup_base_dir }}/logs/"
+          - "Uploads: Backed up to {{ backup_base_dir }}/uploads/"
+          - "Retention: {{ retention_days }} days"

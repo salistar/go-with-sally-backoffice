@@ -1,0 +1,280 @@
+# =============================================================================
+# GoWithSally - Gatling Configuration Example
+# =============================================================================
+# Copy this file to src/gatling/resources/gatling.conf and customize for
+# your environment.
+# =============================================================================
+
+# API Configuration
+app {
+  # Base API URL
+  baseUrl = "http://localhost:5000/api"
+  baseUrl = ${?API_BASE_URL}
+
+  # WebSocket base URL
+  wsBaseUrl = "ws://localhost:5000"
+  wsBaseUrl = ${?WS_BASE_URL}
+
+  # Authentication credentials
+  auth {
+    # Admin user (for admin operations)
+    adminUser = "admin@gowithsally.ma"
+    adminUser = ${?ADMIN_EMAIL}
+
+    adminPassword = "Admin@2024"
+    adminPassword = ${?ADMIN_PASSWORD}
+
+    # Regular user (for user operations)
+    regularUser = "sara.user@gmail.com"
+    regularUser = ${?USER_EMAIL}
+
+    regularPassword = "User@2024"
+    regularPassword = ${?USER_PASSWORD}
+
+    # Driver user (for driver operations)
+    driverUser = "driver@gowithsally.ma"
+    driverUser = ${?DRIVER_EMAIL}
+
+    driverPassword = "Driver@2024"
+    driverPassword = ${?DRIVER_PASSWORD}
+  }
+
+  # Request timeouts (milliseconds)
+  timeouts {
+    requestTimeout = 30000
+    requestTimeout = ${?REQUEST_TIMEOUT}
+
+    connectionTimeout = 10000
+    connectionTimeout = ${?CONNECTION_TIMEOUT}
+
+    socketTimeout = 30000
+    socketTimeout = ${?SOCKET_TIMEOUT}
+  }
+
+  # Performance targets and assertions
+  performance {
+    # Response time thresholds (milliseconds)
+    p50ResponseTime = 200
+    p50ResponseTime = ${?P50_RESPONSE_TIME}
+
+    p95ResponseTime = 500
+    p95ResponseTime = ${?P95_RESPONSE_TIME}
+
+    p99ResponseTime = 1000
+    p99ResponseTime = ${?P99_RESPONSE_TIME}
+
+    maxResponseTime = 5000
+    maxResponseTime = ${?MAX_RESPONSE_TIME}
+
+    # Error rate threshold (percent)
+    maxErrorRate = 1.0
+    maxErrorRate = ${?MAX_ERROR_RATE}
+
+    # Throughput minimum (requests per second)
+    minThroughput = 100
+    minThroughput = ${?MIN_THROUGHPUT}
+
+    # Test scenario parameters
+    rampUpDuration = 2        # minutes
+    rampUpUsers = 10
+    peakUsers = 100
+    sustainDuration = 5       # minutes
+
+    # Spike test parameters
+    spikeDuration = 1         # minute
+    spikeUsers = 200
+
+    # Soak test parameters
+    soakDuration = 10         # minutes
+    soakUsers = 50
+
+    # Stress test parameters
+    stressInitialUsers = 10
+    stressRampDuration = 2    # minutes
+    stressPeakUsers = 200
+  }
+}
+
+# Gatling Core Configuration
+gatling {
+  core {
+    # Simulation run configuration
+    run {
+      timeoutInSeconds = 3600
+      assertionTimeout = 0
+      maxAssertionFailure = 10
+    }
+
+    # Charting configuration
+    charting {
+      noReports = false
+      maxPlots = 25
+      accuracy = 0.4s
+
+      indicators {
+        lowerBound = 800
+        higherBound = 1200
+        percentile1 = 50      # p50
+        percentile2 = 75      # p75
+        percentile3 = 95      # p95
+        percentile4 = 99      # p99
+      }
+    }
+
+    # Extract configuration
+    extract {
+      regex {
+        cacheMaxCapacity = 200
+      }
+      xpath {
+        cacheMaxCapacity = 200
+      }
+      jsonPath {
+        cacheMaxCapacity = 200
+        preferJackson = true
+      }
+      css {
+        cacheMaxCapacity = 200
+      }
+    }
+
+    # Request configuration
+    request {
+      maxRedirects = 5
+      cache = true
+      followRedirect = true
+      autoReferer = true
+      useRawUrl = false
+      httpCompression = true
+      # Warm up URL (optional)
+      warmUpUrl = ${?WARMUP_URL}
+    }
+
+    # Cookie configuration
+    cookie {
+      cookieJar = true
+      storageType = "hashmap"
+      maxAge = 604800
+    }
+
+    # DNS configuration
+    dns {
+      # nameServers = ["8.8.8.8", "8.8.4.4"]
+      ttl = 60
+      negativeTtl = 0
+    }
+
+    # Proxy configuration (optional)
+    # Uncomment and configure if using a proxy
+    # proxy {
+    #   httpProxy {
+    #     host = "proxy.company.com"
+    #     port = "8080"
+    #     username = "user"
+    #     password = "pass"
+    #   }
+    # }
+
+    # WebSocket configuration
+    websocket {
+      wsBaseUrl = ${app.wsBaseUrl}
+      useOpenSsl = true
+    }
+
+    # SSL/TLS configuration (for HTTPS)
+    # ssl {
+    #   keyStore {
+    #     type = "JKS"
+    #     file = "/path/to/keystore.jks"
+    #     password = "changeit"
+    #   }
+    #   trustStore {
+    #     type = "JKS"
+    #     file = "/path/to/truststore.jks"
+    #     password = "changeit"
+    #   }
+    #   checkRevocation = false
+    # }
+
+    # HTTP/2 configuration
+    http2 {
+      enabled = true
+      priorKnowledge = false
+    }
+
+    # HTTP/3 configuration
+    http3 {
+      enabled = false
+    }
+  }
+
+  # HTTP engine configuration
+  http {
+    ahc {
+      allowPoolingConnection = true
+      maxConnections = 10000
+      maxConnectionsPerHost = 2000
+      maxRedirects = 5
+      maxRequestRetry = 2
+      keepAliveEnabled = true
+      pooledConnectionIdleTimeout = 60000
+      chunkedFileChunkSize = 8192
+      strictContentTypeChecking = true
+    }
+  }
+}
+
+# Java/JVM Configuration
+java {
+  net {
+    preferIPv4Stack = true
+    preferIPv6Addresses = false
+  }
+  awt {
+    headless = true
+  }
+}
+
+# Netty Configuration
+netty {
+  noUnsafe = true
+  recycler {
+    maxCapacityPerThread = 0
+  }
+  leakDetection {
+    level = "DISABLED"
+  }
+}
+
+# Environment-specific overrides
+# Development environment
+dev {
+  app {
+    baseUrl = "http://localhost:5000/api"
+  }
+}
+
+# Staging environment
+staging {
+  app {
+    baseUrl = "https://staging.gowithsally.ma/api"
+    performance {
+      p95ResponseTime = 750     # Slightly lenient for staging
+      p99ResponseTime = 1500
+    }
+  }
+}
+
+# Production environment
+prod {
+  app {
+    baseUrl = "https://api.gowithsally.ma"
+    performance {
+      p95ResponseTime = 500
+      p99ResponseTime = 1000
+    }
+  }
+}
+
+# Include environment-specific settings
+# Override with: -Dconfig.file=staging.conf

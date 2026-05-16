@@ -1,0 +1,11 @@
+{
+  "rideId": "test-ride-#{counter}",
+  "rating": 5,
+  "comment": "Great ride experience",
+  "categories": {
+    "cleanliness": 5,
+    "driving": 5,
+    "communication": 5
+  },
+  "wouldRecommend": true
+}

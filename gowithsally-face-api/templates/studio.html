@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoWithSally AI Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: #111c44;
+            border-bottom: 1px solid #2d3e7a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo i {
+            font-size: 24px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #0a0e27;
+            border: 1px solid #2d3e7a;
+        }
+
+        .status-badge.loading {
+            color: #fbbf24;
+            border-color: #fbbf24;
+        }
+
+        .status-badge.healthy {
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .status-badge.warning {
+            color: #f59e0b;
+            border-color: #f59e0b;
+        }
+
+        .status-badge.error {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .api-key-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: #0a0e27;
+            border: 1px solid #2d3e7a;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .api-key-display i {
+            cursor: pointer;
+            color: #8b5cf6;
+            transition: all 0.2s ease;
+        }
+
+        .api-key-display i:hover {
+            color: #a78bfa;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            width: 260px;
+            height: calc(100vh - 70px);
+            background: #111c44;
+            border-right: 1px solid #2d3e7a;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+
+        .sidebar-category {
+            padding: 0;
+            margin: 0;
+        }
+
+        .category-title {
+            padding: 12px 20px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #8b5cf6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        .category-title:first-child {
+            margin-top: 0;
+        }
+
+        .endpoint-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            color: #a0aec0;
+        }
+
+        .endpoint-item:hover {
+            background: rgba(139, 92, 246, 0.1);
+            color: #e0e0e0;
+        }
+
+        .endpoint-item.active {
+            background: rgba(139, 92, 246, 0.2);
+            border-left-color: #8b5cf6;
+            color: #8b5cf6;
+        }
+
+        .endpoint-item i {
+            width: 18px;
+            text-align: center;
+        }
+
+        /* Main content */
+        .main {
+            margin-left: 260px;
+            margin-top: 70px;
+            padding: 30px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .content {
+            max-width: 1200px;
+        }
+
+        /* Endpoint header */
+        .endpoint-header {
+            margin-bottom: 30px;
+        }
+
+        .endpoint-header-top {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .method-badge {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .method-badge.post {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .method-badge.get {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #06b6d4;
+            font-weight: 600;
+        }
+
+        .tech-badges {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .tech-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .tech-badge.ml-local {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+        }
+
+        .tech-badge.ia-cloud {
+            background: rgba(6, 182, 212, 0.2);
+            color: #22d3ee;
+        }
+
+        .tech-badge.yolo {
+            background: rgba(249, 115, 22, 0.2);
+            color: #fb923c;
+        }
+
+        .endpoint-description {
+            font-size: 14px;
+            color: #a0aec0;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+
+        /* Upload section */
+        .upload-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: #0a0e27;
+            border: 1px solid #2d3e7a;
+            border-radius: 12px;
+        }
+
+        .upload-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .upload-zone {
+            flex: 1;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .upload-zone-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8b5cf6;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .upload-zone-content {
+            border: 2px dashed #2d3e7a;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: rgba(139, 92, 246, 0.02);
+        }
+
+        .upload-zone-content:hover {
+            border-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.08);
+        }
+
+        .upload-zone.dragover .upload-zone-content {
+            border-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.15);
+            border-style: solid;
+        }
+
+        .upload-zone-icon {
+            font-size: 36px;
+            color: #8b5cf6;
+            margin-bottom: 10px;
+        }
+
+        .upload-zone-text {
+            font-size: 13px;
+            color: #a0aec0;
+            margin-bottom: 5px;
+        }
+
+        .upload-zone-formats {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .preview-container {
+            display: none;
+            padding: 20px;
+            border: 2px solid #8b5cf6;
+            border-radius: 8px;
+            background: rgba(139, 92, 246, 0.05);
+            text-align: center;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: inline-block;
+            margin: 0 auto;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            max-height: 280px;
+            height: auto;
+            display: block;
+            object-fit: contain;
+            margin: 0 auto;
+            border-radius: 6px;
+        }
+
+        .preview-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .preview-filename {
+            color: #a78bfa;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .remove-file-btn {
+            background: transparent;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            margin-left: 10px;
+        }
+
+        .remove-file-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 4px;
+        }
+
+        .audio-player {
+            margin-top: 10px;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        /* Parameters section */
+        .parameters-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: #0a0e27;
+            border: 1px solid #2d3e7a;
+            border-radius: 12px;
+        }
+
+        .parameters-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .param-group {
+            margin-bottom: 20px;
+        }
+
+        .param-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .param-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #a0aec0;
+        }
+
+        .param-value {
+            color: #8b5cf6;
+            font-family: 'Courier New', monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right, #8b5cf6, #ec4899);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            cursor: pointer;
+            border: 2px solid #0a0e27;
+            box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            cursor: pointer;
+            border: 2px solid #0a0e27;
+            box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            background: #111c44;
+            border: 1px solid #2d3e7a;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover {
+            border-color: #8b5cf6;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+        }
+
+        select option {
+            background: #111c44;
+            color: #e0e0e0;
+        }
+
+        /* Execute button */
+        .execute-section {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .execute-btn {
+            flex: 1;
+            padding: 16px 30px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .execute-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        .execute-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .execute-btn.loading {
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results section */
+        .results-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: #0a0e27;
+            border: 1px solid #2d3e7a;
+            border-radius: 12px;
+        }
+
+        .results-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .loading-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            padding: 40px;
+            color: #a0aec0;
+        }
+
+        .success-state {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .response-meta {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 15px;
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            border-radius: 6px;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+
+        .response-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .response-meta i {
+            font-size: 14px;
+        }
+
+        .json-container {
+            position: relative;
+            background: #000000;
+            border: 1px solid #2d3e7a;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .json-key {
+            color: #8b5cf6;
+        }
+
+        .json-string {
+            color: #10b981;
+        }
+
+        .json-number {
+            color: #06b6d4;
+        }
+
+        .json-boolean {
+            color: #ec4899;
+        }
+
+        .json-null {
+            color: #a0aec0;
+        }
+
+        .copy-json-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            background: #111c44;
+            border: 1px solid #2d3e7a;
+            border-radius: 4px;
+            color: #8b5cf6;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+
+        .copy-json-btn:hover {
+            background: #8b5cf6;
+            color: white;
+            border-color: #8b5cf6;
+        }
+
+        .error-state {
+            padding: 20px;
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            border-radius: 6px;
+        }
+
+        .error-state-title {
+            color: #ef4444;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .error-state-message {
+            color: #fca5a5;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .canvas-container {
+            margin-top: 15px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #2d3e7a;
+            border-radius: 8px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0e27;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #2d3e7a;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3d4f8a;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">
+                <i class="fas fa-face-grin-stars"></i>
+                <span>GoWithSally AI Studio</span>
+            </div>
+            <div class="status-badge loading" id="statusBadge">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span id="statusText">Chargement...</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="api-key-display">
+                <i class="fas fa-eye" id="apiKeyToggle" title="Afficher/masquer"></i>
+                <span id="apiKeyDisplay">••••••••</span>
+            </div>
+            <button class="logout-btn" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar"></div>
+
+    <!-- Main content -->
+    <div class="main">
+        <div class="content" id="content"></div>
+    </div>
+
+    <script>
+        // All endpoints configuration
+        const endpoints = [
+            {
+                category: 'Détection',
+                icon: 'fa-eye',
+                items: [
+                    { name: 'Détecter visages', path: '/api/detect', method: 'POST', description: 'Détecte les visages dans une image avec coordonnées et landmarks', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' },
+                    { name: 'Compter visages', path: '/api/count-faces', method: 'POST', description: 'Compte le nombre de visages (YOLO)', fieldName: 'image', fileAccept: 'image/*', hasParams: ['conf'], tech: 'YOLO' },
+                    { name: 'Détecter têtes', path: '/api/detect-heads', method: 'POST', description: 'Détecte les têtes dans une image (YOLO)', fieldName: 'image', fileAccept: 'image/*', hasParams: ['conf'], tech: 'YOLO' }
+                ]
+            },
+            {
+                category: 'Reconnaissance',
+                icon: 'fa-fingerprint',
+                items: [
+                    { name: 'Reconnaître visage', path: '/api/recognize', method: 'POST', description: 'Extrait le descripteur facial pour identification', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' },
+                    { name: 'Comparer visages', path: '/api/compare', method: 'POST', description: 'Compare deux visages et retourne le score de similarité', fields: [{name:'image1', label:'Image 1'}, {name:'image2', label:'Image 2'}], hasParams: ['threshold'], tech: 'ML Local' }
+                ]
+            },
+            {
+                category: 'Genre',
+                icon: 'fa-venus-mars',
+                items: [
+                    { name: 'Genre par image', path: '/api/gender', method: 'POST', description: 'Détecte le genre à partir du visage (PyTorch + TF)', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' },
+                    { name: 'Genre par voix', path: '/api/voice-gender', method: 'POST', description: 'Détecte le genre à partir d\'un enregistrement vocal (scikit-learn)', fieldName: 'audio', fileAccept: '.wav,.mp3,.ogg,.flac', tech: 'ML Local' }
+                ]
+            },
+            {
+                category: 'Âge',
+                icon: 'fa-hourglass-half',
+                items: [
+                    { name: 'Estimer âge', path: '/api/age', method: 'POST', description: 'Estime l\'âge à partir du visage (Keras)', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' }
+                ]
+            },
+            {
+                category: 'Sécurité',
+                icon: 'fa-shield-alt',
+                items: [
+                    { name: 'Anti-usurpation', path: '/api/antispoof', method: 'POST', description: 'Vérifie si l\'image est un vrai visage ou une photo d\'écran', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' },
+                    { name: 'Vérif. conductrice', path: '/api/driver-verify', method: 'POST', description: 'Vérifie l\'identité de la conductrice en comparant photo profil et selfie', fields: [{name:'profile', label:'Photo Profil'}, {name:'selfie', label:'Selfie Live'}], tech: 'ML Local' },
+                    { name: 'Vérif. passagère', path: '/api/passenger-verify', method: 'POST', description: 'Vérifie l\'identité de la passagère', fields: [{name:'booking', label:'Photo Réservation'}, {name:'live', label:'Photo Live'}], tech: 'ML Local' },
+                    { name: 'Sécurité trajet', path: '/api/trip-safety', method: 'POST', description: 'Analyse la sécurité du trajet avec détection de genre', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' }
+                ]
+            },
+            {
+                category: 'IA Cloud',
+                icon: 'fa-robot',
+                items: [
+                    { name: 'Genre IA', path: '/api/ai/gender', method: 'POST', description: 'Détection de genre via IA externe', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Âge IA', path: '/api/ai/age', method: 'POST', description: 'Estimation d\'âge via IA externe', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Analyse IA', path: '/api/ai/analyze', method: 'POST', description: 'Analyse complète du visage via IA', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Description IA', path: '/api/ai/describe', method: 'POST', description: 'Description détaillée de la personne via IA', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Vérification IA', path: '/api/ai/verify', method: 'POST', description: 'Vérification de genre via IA', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Émotion IA', path: '/api/ai/emotion', method: 'POST', description: 'Détection d\'émotions via IA', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' },
+                    { name: 'Ethnie IA', path: '/api/ai/ethnicity', method: 'POST', description: 'Estimation d\'ethnie via IA', fieldName: 'image', fileAccept: 'image/*', hasParams: ['provider'], tech: 'IA Cloud' }
+                ]
+            },
+            {
+                category: 'Analyse complète',
+                icon: 'fa-microscope',
+                items: [
+                    { name: 'Analyse complète', path: '/api/analyze', method: 'POST', description: 'Pipeline complet: détection + genre + âge + anti-usurpation', fieldName: 'image', fileAccept: 'image/*', tech: 'ML Local' }
+                ]
+            },
+            {
+                category: 'Santé',
+                icon: 'fa-heartbeat',
+                items: [
+                    { name: 'Ping', path: '/api/health/ping', method: 'GET', description: 'Test de connectivité rapide (sans auth)', tech: 'Health' },
+                    { name: 'Status modèles', path: '/api/test', method: 'GET', description: 'Vérifie quels modèles ML sont chargés', tech: 'Health' },
+                    { name: 'Santé complète', path: '/api/health', method: 'GET', description: 'État complet du serveur et des modèles', tech: 'Health' }
+                ]
+            }
+        ];
+
+        let apiKey = '';
+        let apiKeyVisible = false;
+        let selectedEndpoint = null;
+        let uploadedFiles = {};
+        let paramValues = {};
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', async () => {
+            apiKey = sessionStorage.getItem('face_api_key');
+            if (!apiKey) {
+                window.location.href = '/login';
+                return;
+            }
+
+            console.log('[Studio] API Key loaded:', apiKey.substring(0, 8) + '...');
+
+            // Verify the key is still valid
+            try {
+                const testRes = await fetch('/api/health', { headers: { 'X-API-Key': apiKey } });
+                if (testRes.status === 401) {
+                    console.log('[Studio] Key expired, re-login...');
+                    // Try auto re-login
+                    const form = new FormData();
+                    form.append('password', 'sally2024');
+                    const loginRes = await fetch('/api/auth/login', { method: 'POST', body: form });
+                    if (loginRes.ok) {
+                        const loginData = await loginRes.json();
+                        apiKey = loginData.api_key;
+                        sessionStorage.setItem('face_api_key', apiKey);
+                        console.log('[Studio] Re-login OK, new key:', apiKey.substring(0, 8) + '...');
+                    } else {
+                        sessionStorage.removeItem('face_api_key');
+                        window.location.href = '/login';
+                        return;
+                    }
+                }
+            } catch(e) {
+                console.log('[Studio] Key validation failed:', e.message);
+            }
+
+            renderApiKey();
+            renderSidebar();
+            loadModelStatus();
+            selectEndpoint(endpoints[0].items[0]);
+        });
+
+        // Render API key display
+        function renderApiKey() {
+            const display = apiKey.substring(0, 4) + '•'.repeat(Math.max(0, apiKey.length - 8)) + apiKey.substring(Math.max(0, apiKey.length - 4));
+            document.getElementById('apiKeyDisplay').textContent = display;
+        }
+
+        // Toggle API key visibility
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'apiKeyToggle' || e.target.closest('#apiKeyToggle')) {
+                apiKeyVisible = !apiKeyVisible;
+                const display = apiKeyVisible ? apiKey : apiKey.substring(0, 4) + '•'.repeat(Math.max(0, apiKey.length - 8)) + apiKey.substring(Math.max(0, apiKey.length - 4));
+                document.getElementById('apiKeyDisplay').textContent = display;
+            }
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            sessionStorage.removeItem('face_api_key');
+            window.location.href = '/login';
+        });
+
+        // Render sidebar
+        function renderSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.innerHTML = '';
+
+            endpoints.forEach(category => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'sidebar-category';
+
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'category-title';
+                titleDiv.innerHTML = `<i class="fas ${category.icon}"></i> ${category.category}`;
+                categoryDiv.appendChild(titleDiv);
+
+                category.items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'endpoint-item';
+                    itemDiv.innerHTML = `<i class="fas ${category.icon}"></i> ${item.name}`;
+                    itemDiv.addEventListener('click', () => selectEndpoint(item));
+                    categoryDiv.appendChild(itemDiv);
+                });
+
+                sidebar.appendChild(categoryDiv);
+            });
+        }
+
+        // Select endpoint
+        function selectEndpoint(endpoint) {
+            selectedEndpoint = endpoint;
+            uploadedFiles = {};
+            paramValues = {};
+            updateActiveEndpoint();
+            renderContent();
+        }
+
+        // Update active endpoint styling
+        function updateActiveEndpoint() {
+            document.querySelectorAll('.endpoint-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.textContent.trim() === selectedEndpoint.name) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        // Load model status from /api/test
+        // 13 modèles attendus: detector, landmarks, recog_dlib, recog_tf, gender_pth, gender_tf,
+        // antispoof_pth, antispoof_tf, voice_gender, age_keras, age_landmarks_fallback, facecount_yolo, headcount_yolo
+        const EXPECTED_MODELS = 13;
+
+        async function loadModelStatus() {
+            try {
+                const response = await fetch('/api/test');
+                const data = await response.json();
+                const loaded = data.models_count || 0;
+                const isDone = data.models_loading_done;
+                const phase = data.loading_phase || '';
+                const badge = document.getElementById('statusBadge');
+
+                if (isDone && loaded >= 8) {
+                    badge.className = 'status-badge healthy';
+                    document.getElementById('statusText').textContent = `${loaded}/${EXPECTED_MODELS} modèles chargés`;
+                } else if (loaded >= 5) {
+                    badge.className = 'status-badge warning';
+                    document.getElementById('statusText').textContent = isDone
+                        ? `${loaded}/${EXPECTED_MODELS} modèles`
+                        : `${loaded}/${EXPECTED_MODELS} chargés... ${phase ? '(' + phase + ')' : ''}`;
+                    if (!isDone) setTimeout(loadModelStatus, 8000);
+                } else {
+                    badge.className = 'status-badge error';
+                    document.getElementById('statusText').textContent = isDone
+                        ? `${loaded}/${EXPECTED_MODELS} modèles`
+                        : `Chargement... (${loaded}/${EXPECTED_MODELS})`;
+                    if (!isDone) setTimeout(loadModelStatus, 5000);
+                }
+            } catch (error) {
+                const badge = document.getElementById('statusBadge');
+                badge.className = 'status-badge error';
+                document.getElementById('statusText').textContent = 'Erreur de connexion';
+                setTimeout(loadModelStatus, 10000);
+            }
+        }
+
+        // Render content
+        function renderContent() {
+            const content = document.getElementById('content');
+            const endpoint = selectedEndpoint;
+
+            let html = `
+                <div class="endpoint-header">
+                    <div class="endpoint-header-top">
+                        <div class="method-badge ${endpoint.method.toLowerCase()}">${endpoint.method}</div>
+                        <div class="endpoint-path">${endpoint.path}</div>
+                        ${endpoint.tech ? `<div class="tech-badges"><div class="tech-badge ${getTechClass(endpoint.tech)}">${endpoint.tech}</div></div>` : ''}
+                    </div>
+                    <div class="endpoint-description">${endpoint.description || ''}</div>
+                </div>
+            `;
+
+            // Upload section (only for POST with file upload)
+            if (endpoint.method === 'POST') {
+                html += renderUploadSection(endpoint);
+            }
+
+            // Parameters section
+            if (endpoint.hasParams) {
+                html += renderParametersSection(endpoint);
+            }
+
+            // Execute button
+            html += `<div class="execute-section">
+                <button class="execute-btn" id="executeBtn" ${endpoint.method === 'GET' ? '' : 'disabled'}>
+                    <i class="fas fa-play"></i> Exécuter
+                </button>
+            </div>`;
+
+            // Results section
+            html += `<div class="results-section hidden" id="resultsSection">
+                <div class="results-title">Résultats</div>
+                <div id="resultsContent"></div>
+            </div>`;
+
+            content.innerHTML = html;
+
+            // Attach event listeners
+            const executeBtn = document.getElementById('executeBtn');
+            if (executeBtn) {
+                executeBtn.addEventListener('click', executeEndpoint);
+            }
+
+            // Update execute button state
+            updateExecuteButtonState();
+        }
+
+        function renderUploadSection(endpoint) {
+            let html = `<div class="upload-section">`;
+
+            if (endpoint.fields && endpoint.fields.length > 0) {
+                // Multi-file upload
+                html += `<div class="upload-container">`;
+                endpoint.fields.forEach(field => {
+                    const fieldName = typeof field === 'string' ? field : field.name;
+                    const fieldLabel = typeof field === 'string' ? fieldName : field.label;
+                    html += `
+                        <div class="upload-zone" data-field="${fieldName}">
+                            <div class="upload-zone-label">${fieldLabel}</div>
+                            <div class="upload-zone-content" data-field="${fieldName}">
+                                <div class="upload-zone-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                                <div class="upload-zone-text">Glissez une image ici ou cliquez</div>
+                                <div class="upload-zone-formats">JPG, PNG, WebP</div>
+                            </div>
+                            <input type="file" class="file-input" data-field="${fieldName}" accept="image/*">
+                            <div class="preview-container" data-field="${fieldName}"></div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            } else if (endpoint.fieldName) {
+                // Single file upload
+                const isAudio = endpoint.fieldName === 'audio';
+                const icon = isAudio ? 'fa-microphone' : 'fa-cloud-upload-alt';
+                const text = isAudio ? 'Glissez un fichier audio ici ou cliquez' : 'Glissez une image ici ou cliquez pour sélectionner';
+                const formats = isAudio ? '.WAV, .MP3, .OGG, .FLAC' : 'JPG, PNG, WebP';
+
+                html += `
+                    <div class="upload-zone" data-field="${endpoint.fieldName}">
+                        <div class="upload-zone-content">
+                            <div class="upload-zone-icon"><i class="fas ${icon}"></i></div>
+                            <div class="upload-zone-text">${text}</div>
+                            <div class="upload-zone-formats">${formats}</div>
+                        </div>
+                        <input type="file" class="file-input" data-field="${endpoint.fieldName}" accept="${endpoint.fileAccept || 'image/*'}">
+                        <div class="preview-container" data-field="${endpoint.fieldName}"></div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+
+            // Return and attach handlers later
+            setTimeout(() => attachUploadHandlers(endpoint), 0);
+
+            return html;
+        }
+
+        function attachUploadHandlers(endpoint) {
+            // Only select .upload-zone elements (not children with data-field)
+            const zones = document.querySelectorAll('.upload-zone');
+            zones.forEach(zone => {
+                const input = zone.querySelector('.file-input');
+                const content = zone.querySelector('.upload-zone-content');
+                const preview = zone.querySelector('.preview-container');
+                if (!input) return;
+
+                const fieldName = input.dataset.field;
+
+                // Click anywhere in zone to open file picker
+                zone.addEventListener('click', (e) => {
+                    if (e.target.closest('.remove-file-btn') || e.target.closest('.preview-container a')) return;
+                    input.click();
+                });
+
+                // Drag and drop on the zone itself
+                zone.addEventListener('dragenter', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
+                zone.addEventListener('dragleave', (e) => { e.preventDefault(); zone.classList.remove('dragover'); });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.remove('dragover');
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        // Copy files to hidden input
+                        const dt = new DataTransfer();
+                        dt.items.add(e.dataTransfer.files[0]);
+                        input.files = dt.files;
+                        handleFileSelect(fieldName, e.dataTransfer.files[0]);
+                    }
+                });
+
+                // File input change (for click-to-select)
+                input.addEventListener('change', (e) => {
+                    if (e.target.files[0]) {
+                        handleFileSelect(fieldName, e.target.files[0]);
+                    }
+                });
+            });
+
+            // Also prevent default drag on body so dropping outside zones doesn't open file
+            document.body.addEventListener('dragover', (e) => e.preventDefault());
+            document.body.addEventListener('drop', (e) => e.preventDefault());
+        }
+
+        function handleFileSelect(fieldName, file) {
+            uploadedFiles[fieldName] = file;
+            updatePreview(fieldName, file);
+            updateExecuteButtonState();
+        }
+
+        function updatePreview(fieldName, file) {
+            const previewContainer = document.querySelector(`.preview-container[data-field="${fieldName}"]`);
+            if (!previewContainer) return;
+
+            previewContainer.innerHTML = '';
+            previewContainer.style.display = 'block';
+
+            // Hide the upload content (icon + text) to show preview instead
+            const zone = previewContainer.closest('.upload-zone');
+            const content = zone ? zone.querySelector('.upload-zone-content') : null;
+            if (content) content.style.display = 'none';
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewContainer.innerHTML = `
+                        <div class="image-preview">
+                            <img src="${e.target.result}" alt="${file.name}" style="width:100%;height:auto;display:block;border-radius:8px">
+                        </div>
+                        <div class="preview-info">
+                            <span class="preview-filename"><i class="fas fa-image"></i> ${file.name} (${formatFileSize(file.size)})</span>
+                            <button class="remove-file-btn" data-field="${fieldName}"><i class="fas fa-times"></i> Supprimer</button>
+                        </div>
+                    `;
+                    previewContainer.querySelector('.remove-file-btn').addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        delete uploadedFiles[fieldName];
+                        previewContainer.innerHTML = '';
+                        previewContainer.style.display = 'none';
+                        if (content) content.style.display = '';
+                        // Reset file input
+                        const input = zone ? zone.querySelector('.file-input') : null;
+                        if (input) input.value = '';
+                        updateExecuteButtonState();
+                    });
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type.startsWith('audio/')) {
+                const audioUrl = URL.createObjectURL(file);
+                previewContainer.innerHTML = `
+                    <audio controls style="width:100%;margin-bottom:10px"><source src="${audioUrl}"></audio>
+                    <div class="preview-info">
+                        <span class="preview-filename"><i class="fas fa-music"></i> ${file.name} (${formatFileSize(file.size)})</span>
+                        <button class="remove-file-btn" data-field="${fieldName}"><i class="fas fa-times"></i> Supprimer</button>
+                    </div>
+                `;
+                previewContainer.querySelector('.remove-file-btn').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    delete uploadedFiles[fieldName];
+                    previewContainer.innerHTML = '';
+                    previewContainer.style.display = 'none';
+                    if (content) content.style.display = '';
+                    const input = zone ? zone.querySelector('.file-input') : null;
+                    if (input) input.value = '';
+                    URL.revokeObjectURL(audioUrl);
+                    updateExecuteButtonState();
+                });
+            } else {
+                // Generic file
+                previewContainer.innerHTML = `
+                    <div class="preview-info">
+                        <span class="preview-filename"><i class="fas fa-file"></i> ${file.name} (${formatFileSize(file.size)})</span>
+                        <button class="remove-file-btn" data-field="${fieldName}"><i class="fas fa-times"></i> Supprimer</button>
+                    </div>
+                `;
+                previewContainer.querySelector('.remove-file-btn').addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    delete uploadedFiles[fieldName];
+                    previewContainer.innerHTML = '';
+                    previewContainer.style.display = 'none';
+                    if (content) content.style.display = '';
+                    const input = zone ? zone.querySelector('.file-input') : null;
+                    if (input) input.value = '';
+                    updateExecuteButtonState();
+                });
+            }
+        }
+
+        function renderParametersSection(endpoint) {
+            let html = `<div class="parameters-section">
+                <div class="parameters-title">Paramètres</div>`;
+
+            endpoint.hasParams.forEach(param => {
+                if (param === 'conf') {
+                    paramValues.conf = 0.25;
+                    html += `
+                        <div class="param-group">
+                            <div class="param-label">
+                                <span>Confiance (conf)</span>
+                                <span class="param-value" id="confValue">0.25</span>
+                            </div>
+                            <input type="range" id="confSlider" min="0" max="1" step="0.01" value="0.25">
+                        </div>
+                    `;
+                } else if (param === 'threshold') {
+                    paramValues.threshold = 0.6;
+                    html += `
+                        <div class="param-group">
+                            <div class="param-label">
+                                <span>Seuil (threshold)</span>
+                                <span class="param-value" id="thresholdValue">0.60</span>
+                            </div>
+                            <input type="range" id="thresholdSlider" min="0" max="1" step="0.01" value="0.6">
+                        </div>
+                    `;
+                } else if (param === 'provider') {
+                    paramValues.provider = 'gemini';
+                    html += `
+                        <div class="param-group">
+                            <div class="param-label">Fournisseur IA</div>
+                            <select id="providerSelect">
+                                <option value="gemini">Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="grok">Grok</option>
+                                <option value="mistral">Mistral</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="kimi">Kimi</option>
+                            </select>
+                        </div>
+                    `;
+                }
+            });
+
+            html += `</div>`;
+
+            setTimeout(() => attachParameterHandlers(endpoint), 0);
+
+            return html;
+        }
+
+        function attachParameterHandlers(endpoint) {
+            if (endpoint.hasParams.includes('conf')) {
+                const slider = document.getElementById('confSlider');
+                const value = document.getElementById('confValue');
+                if (slider) {
+                    slider.addEventListener('input', (e) => {
+                        paramValues.conf = parseFloat(e.target.value);
+                        value.textContent = e.target.value;
+                    });
+                }
+            }
+
+            if (endpoint.hasParams.includes('threshold')) {
+                const slider = document.getElementById('thresholdSlider');
+                const value = document.getElementById('thresholdValue');
+                if (slider) {
+                    slider.addEventListener('input', (e) => {
+                        paramValues.threshold = parseFloat(e.target.value);
+                        value.textContent = e.target.value.padEnd(4, '0');
+                    });
+                }
+            }
+
+            if (endpoint.hasParams.includes('provider')) {
+                const select = document.getElementById('providerSelect');
+                if (select) {
+                    select.addEventListener('change', (e) => {
+                        paramValues.provider = e.target.value;
+                    });
+                }
+            }
+        }
+
+        function updateExecuteButtonState() {
+            const btn = document.getElementById('executeBtn');
+            if (!btn) return;
+
+            const endpoint = selectedEndpoint;
+
+            if (endpoint.method === 'GET') {
+                btn.disabled = false;
+            } else if (endpoint.fields && endpoint.fields.length > 0) {
+                const allFiles = endpoint.fields.every(f => {
+                    const fieldName = typeof f === 'string' ? f : f.name;
+                    return uploadedFiles[fieldName];
+                });
+                btn.disabled = !allFiles;
+            } else if (endpoint.fieldName) {
+                btn.disabled = !uploadedFiles[endpoint.fieldName];
+            }
+        }
+
+        async function executeEndpoint() {
+            const endpoint = selectedEndpoint;
+            const startTime = Date.now();
+
+            const btn = document.getElementById('executeBtn');
+            btn.classList.add('loading');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Traitement en cours...';
+
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.classList.remove('hidden');
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div> Traitement en cours...</div>';
+
+            try {
+                const formData = new FormData();
+
+                // Add files
+                if (endpoint.fields && endpoint.fields.length > 0) {
+                    endpoint.fields.forEach(field => {
+                        const fieldName = typeof field === 'string' ? field : field.name;
+                        if (uploadedFiles[fieldName]) {
+                            formData.append(fieldName, uploadedFiles[fieldName]);
+                        }
+                    });
+                } else if (endpoint.fieldName && uploadedFiles[endpoint.fieldName]) {
+                    formData.append(endpoint.fieldName, uploadedFiles[endpoint.fieldName]);
+                }
+
+                // Add parameters
+                if (endpoint.hasParams) {
+                    endpoint.hasParams.forEach(param => {
+                        if (paramValues[param] !== undefined) {
+                            formData.append(param, paramValues[param]);
+                        }
+                    });
+                }
+
+                const options = {
+                    method: endpoint.method
+                };
+
+                if (endpoint.method === 'POST') {
+                    options.body = formData;
+                }
+
+                // Always send API key (except for no-auth endpoints)
+                const noAuthPaths = ['/api/health/ping', '/api/test'];
+                if (!noAuthPaths.includes(endpoint.path)) {
+                    options.headers = {
+                        'X-API-Key': apiKey
+                    };
+                }
+
+                const response = await fetch(endpoint.path, options);
+                const responseTime = Date.now() - startTime;
+                const contentType = response.headers.get('content-type') || '';
+                let data;
+
+                if (contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    // Server returned non-JSON (e.g. 500 Internal Server Error as text)
+                    const text = await response.text();
+                    data = { detail: text || `Erreur serveur (${response.status})` };
+                }
+
+                if (response.ok) {
+                    displaySuccess(data, response.status, responseTime, endpoint);
+                } else {
+                    const errMsg = data.detail || data.error || data.message || JSON.stringify(data);
+                    displayError(response.status, errMsg, endpoint);
+                }
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                displayError(0, error.message, endpoint);
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-play"></i> Exécuter';
+            }
+        }
+
+        function displaySuccess(data, statusCode, responseTime, endpoint) {
+            const resultsContent = document.getElementById('resultsContent');
+            const jsonString = JSON.stringify(data, null, 2);
+
+            let html = `
+                <div class="success-state">
+                    <div class="response-meta">
+                        <div class="response-meta-item">
+                            <i class="fas fa-check-circle"></i>
+                            Succès
+                        </div>
+                        <div class="response-meta-item">
+                            Code: <span style="color: #06b6d4;">${statusCode}</span>
+                        </div>
+                        <div class="response-meta-item">
+                            Temps: <span style="color: #06b6d4;">${responseTime}ms</span>
+                        </div>
+                    </div>
+                    <div style="position: relative;">
+                        <button class="copy-json-btn" onclick="copyToClipboard()">
+                            <i class="fas fa-copy"></i> Copier JSON
+                        </button>
+                        <div class="json-container" id="jsonOutput"></div>
+                    </div>
+            `;
+
+            resultsContent.innerHTML = html;
+
+            // Render JSON
+            const jsonContainer = document.getElementById('jsonOutput');
+            jsonContainer.innerHTML = syntaxHighlightJSON(jsonString);
+
+            // Store JSON for copy
+            window.currentJSON = jsonString;
+
+            // Draw canvas if faces detected
+            if (data.faces && data.faces.length > 0 && uploadedFiles[selectedEndpoint.fieldName]) {
+                drawFacesOnCanvas(data.faces, uploadedFiles[selectedEndpoint.fieldName]);
+            }
+
+            resultsContent.innerHTML += '</div>';
+        }
+
+        function displayError(statusCode, errorMessage, endpoint) {
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = `
+                <div class="error-state">
+                    <div class="error-state-title">
+                        <i class="fas fa-exclamation-circle"></i> Erreur ${statusCode}
+                    </div>
+                    <div class="error-state-message">${errorMessage}</div>
+                </div>
+            `;
+        }
+
+        function syntaxHighlightJSON(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(window.currentJSON).then(() => {
+                const btn = event.target.closest('.copy-json-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copié!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function drawFacesOnCanvas(faces, imageFile) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.drawImage(img, 0, 0);
+                    ctx.strokeStyle = '#8b5cf6';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = 'rgba(139, 92, 246, 0.1)';
+
+                    faces.forEach(face => {
+                        if (face.bbox) {
+                            const [x, y, w, h] = face.bbox;
+                            ctx.fillRect(x, y, w, h);
+                            ctx.strokeRect(x, y, w, h);
+                        }
+                    });
+
+                    const resultsContent = document.getElementById('resultsContent');
+                    const container = document.createElement('div');
+                    container.className = 'canvas-container';
+                    container.appendChild(canvas);
+                    resultsContent.appendChild(container);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(imageFile);
+        }
+
+        function getTechClass(tech) {
+            if (tech === 'ML Local') return 'ml-local';
+            if (tech === 'IA Cloud') return 'ia-cloud';
+            if (tech === 'YOLO') return 'yolo';
+            return 'ml-local';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        window.copyToClipboard = copyToClipboard;
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "require": [],
+  "spec": "tests/unit/**/*.test.js",
+  "timeout": 10000,
+  "exit": true,
+  "recursive": true,
+  "reporter": "spec",
+  "colors": true,
+  "slow": 1000
+}

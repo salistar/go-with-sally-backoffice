@@ -1,0 +1,86 @@
+# ==============================================================================
+# GO WITH SALLY - Face AI Studio v4.0 - Docker Compose (Development)
+# ==============================================================================
+#
+#   Dev:   docker compose up
+#   Prod:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Scale: docker compose up -d --scale api=3
+#   Logs:  docker compose logs -f api
+#
+# ==============================================================================
+
+services:
+
+  # --- Face AI API ------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TF: "false"
+    image: gowithsally/face-api:latest
+    container_name: sally-face-api
+
+    # Dev mode: uvicorn --reload
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --log-level info
+
+    ports:
+      - "${PORT:-8000}:8000"
+
+    volumes:
+      - ./models:/app/models
+      - ./app:/app/app
+      - ./templates:/app/templates
+      - ./static:/app/static
+
+    env_file:
+      - .env
+
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    restart: unless-stopped
+    networks:
+      - sally-net
+
+  # --- Redis (caching + rate limiting) ----------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sally-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - sally-net
+
+
+networks:
+  sally-net:
+    driver: bridge
+
+volumes:
+  redis-data:

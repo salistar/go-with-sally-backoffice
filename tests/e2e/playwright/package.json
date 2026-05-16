@@ -1,0 +1,49 @@
+{
+  "name": "gowithsally-e2e-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive End-to-End tests for GoWithSally using Playwright - 90% coverage",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
+    "test:staging": "PLAYWRIGHT_TEST_BASE_URL=https://staging-api.gowithsally.ma playwright test",
+    "test:prod": "PLAYWRIGHT_TEST_BASE_URL=https://api.gowithsally.ma playwright test",
+    "test:auth": "playwright test auth.spec.ts",
+    "test:rides": "playwright test ride-management.spec.ts",
+    "test:users": "playwright test user-management.spec.ts",
+    "test:drivers": "playwright test driver-management.spec.ts",
+    "test:i18n": "playwright test i18n-rtl.spec.ts",
+    "test:a11y": "playwright test accessibility.spec.ts",
+    "test:api": "playwright test api-integration.spec.ts",
+    "test:performance": "playwright test performance.spec.ts",
+    "test:landing": "playwright test landing-page.spec.ts",
+    "test:admin": "playwright test admin-dashboard.spec.ts",
+    "test:all": "playwright test",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install",
+    "codegen": "playwright codegen http://localhost:3000"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.1",
+    "@types/node": "^20.0.0"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "testing",
+    "automation",
+    "gowithsally",
+    "ride-hailing",
+    "women-safety"
+  ],
+  "author": "GoWithSally",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

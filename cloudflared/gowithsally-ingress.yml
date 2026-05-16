@@ -1,0 +1,20 @@
+# Cloudflare Tunnel - entrees ingress GoWithSally
+# =================================================
+# Le VPS a DEJA un tunnel SallyCards (~/.cloudflared/config.yml).
+# NE PAS creer un 2e tunnel : AJOUTER ces 3 entrees dans le bloc `ingress:`
+# du config.yml existant, AVANT la ligne catch-all `- service: http_status:404`.
+#
+# Puis creer les DNS records (sur le tunnel SallyCards existant <NAME>) :
+#   cloudflared tunnel route dns <NAME> gowithsally.salistar.com
+#   cloudflared tunnel route dns <NAME> api.gowithsally.salistar.com
+#   cloudflared tunnel route dns <NAME> aigowithsally.salistar.com
+#   sudo systemctl restart cloudflared
+
+  - hostname: gowithsally.salistar.com
+    service: http://localhost:3100
+  - hostname: api.gowithsally.salistar.com
+    service: http://localhost:5000
+  - hostname: aigowithsally.salistar.com
+    service: http://localhost:8000
+    originRequest:
+      connectTimeout: 30s

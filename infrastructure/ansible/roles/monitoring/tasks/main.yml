@@ -1,0 +1,410 @@
+---
+- name: Create monitoring user
+  user:
+    name: monitoring
+    shell: /bin/bash
+    home: /var/lib/monitoring
+    createhome: yes
+    state: present
+
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: monitoring
+    group: monitoring
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+    - /var/lib/prometheus/rules
+    - /var/lib/grafana
+    - /var/log/monitoring
+
+- name: Install monitoring dependencies
+  apt:
+    name:
+      - prometheus-node-exporter
+      - wget
+      - curl
+      - jq
+      - git
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Enable Node Exporter
+  systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: yes
+
+- name: Create Prometheus configuration
+  copy:
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+        external_labels:
+          environment: '{{ environment | default("unknown") }}'
+          region: '{{ ansible_default_ipv4.address }}'
+
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets:
+                  - localhost:9093
+
+      rule_files:
+        - '/etc/prometheus/rules.yml'
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+        - job_name: 'node'
+          static_configs:
+            - targets: ['localhost:9100']
+
+        - job_name: 'gowithsally-app'
+          metrics_path: '/metrics'
+          static_configs:
+            - targets: ['localhost:3000']
+          scrape_interval: 30s
+
+        - job_name: 'docker'
+          static_configs:
+            - targets: ['localhost:9323']
+          scrape_interval: 30s
+
+        - job_name: 'mongodb'
+          static_configs:
+            - targets: ['localhost:27017']
+          scrape_interval: 30s
+
+        - job_name: 'redis'
+          static_configs:
+            - targets: ['localhost:6379']
+          scrape_interval: 30s
+    dest: /etc/prometheus/prometheus.yml
+    owner: monitoring
+    group: monitoring
+    mode: '0644'
+
+- name: Create Prometheus alert rules
+  copy:
+    content: |
+      groups:
+        - name: gowithsally
+          interval: 30s
+          rules:
+            - alert: InstanceDown
+              expr: up == 0
+              for: 2m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Instance {{ $labels.instance }} is down"
+                description: "{{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+            - alert: HighCPUUsage
+              expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High CPU usage on {{ $labels.instance }}"
+                description: "CPU usage is {{ $value | humanizePercentage }}"
+
+            - alert: HighMemoryUsage
+              expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High memory usage on {{ $labels.instance }}"
+                description: "Memory usage is {{ $value | humanizePercentage }}"
+
+            - alert: DiskSpaceRunningOut
+              expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Low disk space on {{ $labels.instance }}"
+                description: "{{ $value | humanizePercentage }} disk space remaining"
+
+            - alert: HighLoadAverage
+              expr: node_load5 > on(instance) group_left(count) count(node_cpu_seconds_total{mode="idle"})
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High load average on {{ $labels.instance }}"
+                description: "Load average is {{ $value }}"
+
+            - alert: DockerContainerDown
+              expr: docker_container_state_running == 0
+              for: 2m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Docker container is not running"
+                description: "Container {{ $labels.name }} is not running"
+
+            - alert: ApplicationErrorRate
+              expr: |
+                (
+                  sum(rate(http_request_duration_seconds_bucket{le="+Inf", status=~"5.."}[5m]))
+                  /
+                  sum(rate(http_request_duration_seconds_bucket{le="+Inf"}[5m]))
+                ) > 0.05
+              for: 2m
+              labels:
+                severity: critical
+              annotations:
+                summary: "High error rate in application"
+                description: "Error rate is {{ $value | humanizePercentage }}"
+
+            - alert: SlowApplicationResponse
+              expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Slow application response times"
+                description: "95th percentile response time is {{ $value }}s"
+
+            - alert: RedisMemoryUsageHigh
+              expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Redis memory usage is high"
+                description: "{{ $value | humanizePercentage }} of memory in use"
+    dest: /etc/prometheus/rules.yml
+    owner: monitoring
+    group: monitoring
+    mode: '0644'
+
+- name: Create Grafana provisioning directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: '0755'
+  loop:
+    - /etc/grafana/provisioning/dashboards
+    - /etc/grafana/provisioning/datasources
+  ignore_errors: yes
+
+- name: Configure Prometheus datasource in Grafana
+  copy:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://localhost:9090
+          isDefault: true
+          editable: true
+          jsonData:
+            timeInterval: 15s
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  ignore_errors: yes
+
+- name: Create custom Grafana dashboard
+  copy:
+    content: |
+      {
+        "dashboard": {
+          "title": "GoWithSally Application Metrics",
+          "panels": [
+            {
+              "title": "CPU Usage",
+              "targets": [
+                {
+                  "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+                }
+              ]
+            },
+            {
+              "title": "Memory Usage",
+              "targets": [
+                {
+                  "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100"
+                }
+              ]
+            },
+            {
+              "title": "Application Request Rate",
+              "targets": [
+                {
+                  "expr": "sum(rate(http_request_duration_seconds_count[5m]))"
+                }
+              ]
+            },
+            {
+              "title": "Error Rate",
+              "targets": [
+                {
+                  "expr": "sum(rate(http_request_duration_seconds_bucket{status=~\"5..\"}[5m]))"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    dest: /etc/grafana/provisioning/dashboards/gowithsally.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  ignore_errors: yes
+
+- name: Create Alertmanager webhook script
+  copy:
+    content: |
+      #!/bin/bash
+      # Webhook handler for Alertmanager alerts
+      # Can integrate with Slack, PagerDuty, Opsgenie, etc.
+
+      WEBHOOK_URL="${ALERTMANAGER_WEBHOOK_URL:-http://localhost:5001/alerts}"
+      ALERT_LEVEL="${ALERT_LEVEL:-info}"
+
+      # Log alerts to file
+      echo "[$(date)] Alert received: $@" >> /var/log/monitoring/alertmanager-webhook.log
+
+      # Send to external service (e.g., Slack)
+      if [ -n "$SLACK_WEBHOOK_URL" ]; then
+        curl -X POST "$SLACK_WEBHOOK_URL" \
+          -H 'Content-Type: application/json' \
+          -d "{\"text\": \"Alert: $@\"}" || true
+      fi
+
+      exit 0
+    dest: /usr/local/bin/alertmanager-webhook.sh
+    owner: monitoring
+    group: monitoring
+    mode: '0755'
+
+- name: Install and configure rsyslog for metrics collection
+  block:
+    - name: Install rsyslog
+      apt:
+        name: rsyslog
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Configure rsyslog for JSON logging
+      copy:
+        content: |
+          $ActionFileDefaultTemplate RSYSLOG_FileFormat
+          $FileCreateMode 0640
+
+          # Include monitoring rules
+          $IncludeConfig /etc/rsyslog.d/50-default.conf
+
+          # Send metrics to file
+          :programname, contains, "monitoring" /var/log/monitoring/metrics.log
+          & stop
+        dest: /etc/rsyslog.d/50-gowithsally.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart rsyslog
+
+    - name: Enable rsyslog service
+      systemd:
+        name: rsyslog
+        state: started
+        enabled: yes
+
+  when: ansible_os_family == "Debian"
+
+- name: Set up log rotation for monitoring
+  copy:
+    content: |
+      /var/log/monitoring/*.log {
+        daily
+        rotate 14
+        compress
+        delaycompress
+        notifempty
+        create 0640 monitoring monitoring
+        sharedscripts
+        postrotate
+          systemctl reload rsyslog > /dev/null 2>&1 || true
+        endscript
+      }
+    dest: /etc/logrotate.d/gowithsally-monitoring
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create monitoring startup script
+  copy:
+    content: |
+      #!/bin/bash
+      # Start monitoring services
+      set -e
+
+      echo "[$(date)] Starting monitoring services..."
+
+      # Ensure directories exist
+      mkdir -p /var/lib/prometheus /var/lib/grafana /var/log/monitoring
+
+      # Start Node Exporter if not running
+      if ! systemctl is-active --quiet prometheus-node-exporter; then
+        echo "[$(date)] Starting prometheus-node-exporter..."
+        systemctl start prometheus-node-exporter
+      fi
+
+      echo "[$(date)] Monitoring services started successfully"
+    dest: /usr/local/bin/start-monitoring.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create monitoring health check script
+  copy:
+    content: |
+      #!/bin/bash
+      # Health check for monitoring services
+
+      FAILED=0
+
+      # Check Node Exporter
+      if ! curl -s http://localhost:9100/metrics > /dev/null; then
+        echo "WARNING: Node Exporter not responding"
+        FAILED=$((FAILED + 1))
+      fi
+
+      # Check Prometheus
+      if ! curl -s http://localhost:9090/-/healthy > /dev/null; then
+        echo "WARNING: Prometheus not responding"
+        FAILED=$((FAILED + 1))
+      fi
+
+      # Check Alertmanager
+      if ! curl -s http://localhost:9093/-/healthy > /dev/null; then
+        echo "WARNING: Alertmanager not responding"
+        FAILED=$((FAILED + 1))
+      fi
+
+      if [ $FAILED -gt 0 ]; then
+        echo "FAILED: $FAILED monitoring service(s) not responding"
+        exit 1
+      fi
+
+      echo "OK: All monitoring services are healthy"
+      exit 0
+    dest: /usr/local/bin/check-monitoring-health.sh
+    owner: root
+    group: root
+    mode: '0755'

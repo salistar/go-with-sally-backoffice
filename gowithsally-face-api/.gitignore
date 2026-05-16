@@ -1,0 +1,61 @@
+# Environment
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+
+# Models (too large for git)
+models/**/*.dat
+models/**/*.pth
+models/**/*.h5
+models/**/*.keras
+models/**/*.tflite
+models/**/*.pt
+models/**/*.pkl
+models/**/*.onnx
+!models/.gitkeep
+
+# Datasets
+datasets/
+voice_gender/data/
+age_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
+
+# Logs
+*.log
+logs/
+
+# Test files
+*.jpg
+*.png
+*.mp3
+*.wav
+!static/**
+
+# Node
+node_modules/
+
+# Nginx certs
+nginx/certs/

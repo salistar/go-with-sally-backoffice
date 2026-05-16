@@ -1,0 +1,127 @@
+##############################################################################
+# Go With Sally - Backoffice - Deploiement PRODUCTION (methode SallyCards)
+#
+# Reprend le pipeline sallycards-backoffice/deploy-prod.yml :
+#   build images -> GHCR -> SSH VPS -> docker compose pull+up -> CF purge
+#   -> health-check des endpoints publics.
+#
+# IMPORTANT : declenche UNIQUEMENT a la main (workflow_dispatch).
+# Tant qu'on ne le lance pas depuis l'onglet Actions, RIEN ne touche le VPS
+# de production SallyCards. (Decision : "STOP avant le VPS".)
+#
+# Secrets requis (repo > Settings > Secrets and variables > Actions) :
+#   VPS_HOST       91.99.70.43
+#   VPS_USER       deploy
+#   VPS_SSH_KEY    (cle privee SSH deploy@VPS)
+#   CF_ZONE_ID     (optionnel — purge cache Cloudflare)
+#   CF_API_TOKEN   (optionnel — purge cache Cloudflare)
+# (Le push GHCR utilise GITHUB_TOKEN ; images publiques -> pull VPS sans PAT.)
+##############################################################################
+name: Deploy Prod (VPS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      with_elk:
+        description: "Inclure la stack ELK (RAM!)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: salistar
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - name: gws-backend
+            context: ./gowithsally-backend
+            file: ./gowithsally-backend/Dockerfile
+            target: production
+          - name: gws-web
+            context: ./gowithsally-web
+            file: ./gowithsally-web/Dockerfile
+            target: ""
+          - name: gws-face-api
+            context: ./gowithsally-face-api
+            file: ./gowithsally-face-api/Dockerfile
+            target: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.name }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: SSH deploy sur le VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/apps/go-with-sally-backoffice
+            git pull --ff-only origin main
+            export IMAGE_TAG=${{ github.sha }}
+            PROFILES=""
+            if [ "${{ github.event.inputs.with_elk }}" = "true" ]; then PROFILES="--profile elk"; fi
+            docker compose --env-file .env.production -f docker-compose.vps.yml pull
+            docker compose --env-file .env.production -f docker-compose.vps.yml $PROFILES up -d
+            docker image prune -f
+
+  cloudflare-purge:
+    needs: deploy
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Purge cache Cloudflare (si configure)
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_API_TOKEN" ]; then
+            echo "Secrets Cloudflare absents -> purge ignoree."; exit 0
+          fi
+          curl -fsSL -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Verifier les endpoints publics
+        run: |
+          set -e
+          curl -fsS  https://api.gowithsally.salistar.com/health
+          curl -fsS  https://aigowithsally.salistar.com/api/health/ping
+          curl -fsSI https://gowithsally.salistar.com | head -n1
+          echo "Health-check OK"

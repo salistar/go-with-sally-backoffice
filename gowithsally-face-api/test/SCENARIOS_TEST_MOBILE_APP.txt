@@ -1,0 +1,719 @@
+================================================================================
+   SCENARIOS DE TEST - Application Mobile GoWithSally
+   Date: 20 Mars 2026
+================================================================================
+
+TABLE DES MATIERES
+==================
+A. Tests cote IA (API Face)
+B. Tests cote App Mobile
+C. Tests Integration (App + API)
+D. Tests de Performance & Charge
+E. Tests de Securite
+
+================================================================================
+A. TESTS COTE IA (API FACE) - 13 MODELES
+================================================================================
+
+A1. DETECTION DE VISAGE (Model #1: dlib HOG)
+---------------------------------------------
+SC-A1-01: Photo portrait claire, face frontale
+  Action: POST /api/detect avec photo portrait
+  Attendu: 1 visage detecte, bounding box correct, confidence > 0.8
+  Priorite: CRITIQUE
+
+SC-A1-02: Photo de profil (visage tourne 45°)
+  Action: POST /api/detect avec profil
+  Attendu: Visage detecte ou message "no face" (acceptable)
+  Priorite: HAUTE
+
+SC-A1-03: Photo avec lunettes de soleil
+  Action: POST /api/detect avec lunettes noires
+  Attendu: Visage detecte (les lunettes ne doivent pas empecher la detection)
+  Priorite: HAUTE
+
+SC-A1-04: Photo avec masque facial
+  Action: POST /api/detect avec masque COVID
+  Attendu: Visage detecte partiellement ou non detecte (acceptable)
+  Priorite: MOYENNE
+
+SC-A1-05: Photo tres sombre (sous-exposee)
+  Action: POST /api/detect avec image noire
+  Attendu: Pas de crash, message d'erreur propre ou 0 visages
+  Priorite: HAUTE
+
+SC-A1-06: Photo tres claire (sur-exposee)
+  Action: POST /api/detect avec image blanche
+  Attendu: Pas de crash, message d'erreur propre ou 0 visages
+  Priorite: HAUTE
+
+SC-A1-07: Photo floue (mauvaise mise au point)
+  Action: POST /api/detect avec image floue
+  Attendu: Pas de crash, detection possible si flou leger
+  Priorite: HAUTE
+
+SC-A1-08: Photo sans visage (paysage, objet)
+  Action: POST /api/detect avec photo de nature
+  Attendu: 0 visages detectes, code 200
+  Priorite: HAUTE
+
+SC-A1-09: Selfie camera frontale
+  Action: POST /api/detect avec selfie classique
+  Attendu: 1 visage detecte
+  Priorite: CRITIQUE
+
+SC-A1-10: Photo avec multiple visages
+  Action: POST /api/detect avec groupe de personnes
+  Attendu: Nombre correct de visages detectes
+  Priorite: HAUTE
+
+
+A2. LANDMARKS (Model #2: 68 points)
+------------------------------------
+SC-A2-01: Verification des 68 points sur visage frontal
+  Action: POST /api/detect, verifier landmarks dans la reponse
+  Attendu: 68 points retournes, positions coherentes
+  Priorite: HAUTE
+
+SC-A2-02: Landmarks avec visage partiellement cache
+  Action: POST /api/detect avec main devant une partie du visage
+  Attendu: Landmarks retournes (meme imprecis), pas de crash
+  Priorite: MOYENNE
+
+
+A3. RECONNAISSANCE FACIALE (Models #3 dlib + #4 TF)
+----------------------------------------------------
+SC-A3-01: Comparer 2 photos de la MEME personne
+  Action: POST /api/compare avec file1 + file2 (meme personne)
+  Attendu: match=true, distance < 0.45
+  Priorite: CRITIQUE
+
+SC-A3-02: Comparer 2 photos de personnes DIFFERENTES
+  Action: POST /api/compare avec file1 + file2 (personnes differentes)
+  Attendu: match=false, distance > 0.55
+  Priorite: CRITIQUE
+
+SC-A3-03: Comparer meme personne avec eclairage different
+  Action: POST /api/compare (jour vs nuit, flash vs naturel)
+  Attendu: match=true (tolerance d'eclairage)
+  Priorite: HAUTE
+
+SC-A3-04: Comparer meme personne avec/sans lunettes
+  Action: POST /api/compare (avec vs sans lunettes)
+  Attendu: match=true (tolerance d'accessoires)
+  Priorite: HAUTE
+
+SC-A3-05: Comparer meme personne avec chapeau/bonnet
+  Action: POST /api/compare (avec vs sans chapeau)
+  Attendu: match=true
+  Priorite: MOYENNE
+
+SC-A3-06: Comparer meme personne: photo ancienne vs recente
+  Action: POST /api/compare (photo de 5 ans vs recente)
+  Attendu: match=true (si changements legers)
+  Priorite: HAUTE
+
+SC-A3-07: Comparer jumeaux identiques
+  Action: POST /api/compare avec photos de jumeaux
+  Attendu: match=true (acceptable) ou false (acceptable)
+  Priorite: BASSE
+
+SC-A3-08: Embedding 128 dimensions
+  Action: POST /api/recognize, verifier embedding
+  Attendu: Tableau de 128 floats, valeurs entre -1 et 1
+  Priorite: HAUTE
+
+
+A4. CLASSIFICATION GENRE (Models #5 PyTorch + #6 TF)
+-----------------------------------------------------
+SC-A4-01: Homme adulte, visage clair
+  Action: POST /api/gender avec photo homme
+  Attendu: gender="male", confidence > 0.7
+  Priorite: CRITIQUE
+
+SC-A4-02: Femme adulte, visage clair
+  Action: POST /api/gender avec photo femme
+  Attendu: gender="female", confidence > 0.7
+  Priorite: CRITIQUE
+
+SC-A4-03: Enfant garcon
+  Action: POST /api/gender avec photo garcon ~8 ans
+  Attendu: gender="male" (peut etre moins fiable chez les enfants)
+  Priorite: HAUTE
+
+SC-A4-04: Enfant fille
+  Action: POST /api/gender avec photo fille ~8 ans
+  Attendu: gender="female"
+  Priorite: HAUTE
+
+SC-A4-05: Personne agee homme
+  Action: POST /api/gender avec photo homme 70+ ans
+  Attendu: gender="male"
+  Priorite: HAUTE
+
+SC-A4-06: Personne agee femme
+  Action: POST /api/gender avec photo femme 70+ ans
+  Attendu: gender="female"
+  Priorite: HAUTE
+
+SC-A4-07: Visage avec maquillage lourd
+  Action: POST /api/gender avec maquillage theatral
+  Attendu: Genre detecte (peut varier), pas de crash
+  Priorite: MOYENNE
+
+SC-A4-08: Photo sans visage
+  Action: POST /api/gender avec paysage
+  Attendu: Erreur propre "no face detected" ou code 400
+  Priorite: HAUTE
+
+
+A5. ANTI-SPOOF / LIVENESS (Models #7 PyTorch + #8 TF)
+------------------------------------------------------
+SC-A5-01: Vrai visage en personne (camera live)
+  Action: POST /api/antispoof avec photo live
+  Attendu: is_real=true, confidence > 0.7
+  Priorite: CRITIQUE
+
+SC-A5-02: Photo d'ecran de telephone (spoof)
+  Action: POST /api/antispoof avec photo d'ecran montrant un visage
+  Attendu: is_real=false (idealement)
+  Priorite: CRITIQUE
+
+SC-A5-03: Photo imprimee sur papier (spoof)
+  Action: POST /api/antispoof avec photo de photo papier
+  Attendu: is_real=false (idealement)
+  Priorite: CRITIQUE
+
+SC-A5-04: Photo d'ecran d'ordinateur (spoof)
+  Action: POST /api/antispoof avec capture ecran PC
+  Attendu: is_real=false (idealement)
+  Priorite: HAUTE
+
+SC-A5-05: Masque 3D (spoof avance)
+  Action: POST /api/antispoof avec masque realiste
+  Attendu: Detection variable (test informatif)
+  Priorite: BASSE
+
+SC-A5-06: Photo LEGO/dessin (clairement faux)
+  Action: POST /api/antispoof avec visage LEGO
+  Attendu: is_real=false
+  Priorite: MOYENNE
+
+
+A6. GENRE VOCAL (Model #9: sklearn ensemble)
+---------------------------------------------
+SC-A6-01: Voix masculine grave
+  Action: POST /api/voice-gender avec enregistrement homme grave
+  Attendu: gender="male", confidence > 0.6
+  Priorite: CRITIQUE
+
+SC-A6-02: Voix feminine aigue
+  Action: POST /api/voice-gender avec enregistrement femme aigue
+  Attendu: gender="female", confidence > 0.6
+  Priorite: CRITIQUE
+
+SC-A6-03: Chanson homme (MP3)
+  Action: POST /api/voice-gender avec male_song.mp3
+  Attendu: gender="male"
+  Priorite: HAUTE
+
+SC-A6-04: Chanson femme (MP3)
+  Action: POST /api/voice-gender avec female_song.mp3
+  Attendu: gender="female"
+  Priorite: HAUTE
+
+SC-A6-05: Audio silencieux
+  Action: POST /api/voice-gender avec fichier silence
+  Attendu: Erreur propre ou resultat "unknown"
+  Priorite: HAUTE
+
+SC-A6-06: Audio tres court (<1 seconde)
+  Action: POST /api/voice-gender avec audio 0.5s
+  Attendu: Erreur propre ou resultat moins fiable
+  Priorite: HAUTE
+
+SC-A6-07: Audio avec bruit de fond important
+  Action: POST /api/voice-gender avec audio bruite
+  Attendu: Resultat (peut etre imprecis), pas de crash
+  Priorite: MOYENNE
+
+SC-A6-08: Voix d'enfant
+  Action: POST /api/voice-gender avec voix d'enfant
+  Attendu: Genre detecte (precision variable, acceptable)
+  Priorite: BASSE
+
+
+A7. ESTIMATION D'AGE (Models #10 TFLite + #11 Keras)
+-----------------------------------------------------
+SC-A7-01: Bebe / tout-petit (0-3 ans)
+  Action: POST /api/age avec photo bebe
+  Attendu: age entre 0 et 5
+  Priorite: HAUTE
+
+SC-A7-02: Enfant (5-12 ans)
+  Action: POST /api/age avec photo enfant
+  Attendu: age entre 3 et 15 (marge +/- 3 ans)
+  Priorite: HAUTE
+
+SC-A7-03: Adolescent (13-17 ans)
+  Action: POST /api/age avec photo ado
+  Attendu: age entre 10 et 20
+  Priorite: CRITIQUE (important pour verification 18+)
+
+SC-A7-04: Jeune adulte (18-30 ans)
+  Action: POST /api/age avec photo jeune adulte
+  Attendu: age entre 16 et 35
+  Priorite: CRITIQUE
+
+SC-A7-05: Adulte (30-50 ans)
+  Action: POST /api/age avec photo adulte
+  Attendu: age entre 25 et 55
+  Priorite: HAUTE
+
+SC-A7-06: Senior (60+ ans)
+  Action: POST /api/age avec photo personne agee
+  Attendu: age > 50
+  Priorite: HAUTE
+
+SC-A7-07: Verification 18+ (conducteur)
+  Action: POST /api/age, verifier age >= 18
+  Attendu: L'API determine correctement si la personne est majeure
+  Priorite: CRITIQUE
+
+
+A8. COMPTAGE YOLO (Models #12 Face + #13 Head)
+-----------------------------------------------
+SC-A8-01: Image avec 1 personne
+  Action: POST /api/count-faces avec portrait
+  Attendu: count=1
+  Priorite: CRITIQUE
+
+SC-A8-02: Image avec 2 personnes
+  Action: POST /api/count-faces avec duo
+  Attendu: count=2
+  Priorite: HAUTE
+
+SC-A8-03: Image avec 4+ personnes
+  Action: POST /api/count-faces avec groupe
+  Attendu: count >= 4
+  Priorite: HAUTE
+
+SC-A8-04: Image vide (pas de personne)
+  Action: POST /api/count-faces avec paysage
+  Attendu: count=0
+  Priorite: HAUTE
+
+SC-A8-05: Comptage de tetes (vision plus large)
+  Action: POST /api/detect-heads avec image
+  Attendu: count >= nombre de visages detectes
+  Priorite: HAUTE
+
+SC-A8-06: Foule dense (10+ personnes)
+  Action: POST /api/count-faces avec photo de foule
+  Attendu: count > 5 (meme si imprecis)
+  Priorite: BASSE
+
+
+================================================================================
+B. TESTS COTE APP MOBILE (React Native / Expo SDK 52)
+================================================================================
+
+B1. INSCRIPTION & AUTHENTIFICATION
+-----------------------------------
+SC-B1-01: Inscription nouveau conducteur
+  Action: Remplir formulaire inscription conducteur
+  Attendu: Compte cree, redirection vers verification
+  Priorite: CRITIQUE
+
+SC-B1-02: Inscription nouveau passager
+  Action: Remplir formulaire inscription passager
+  Attendu: Compte cree, redirection vers accueil
+  Priorite: CRITIQUE
+
+SC-B1-03: Login avec identifiants corrects
+  Action: Entrer email + mot de passe valides
+  Attendu: Connexion reussie, token sauvegarde
+  Priorite: CRITIQUE
+
+SC-B1-04: Login avec identifiants incorrects
+  Action: Entrer mauvais mot de passe
+  Attendu: Message d'erreur, pas de connexion
+  Priorite: CRITIQUE
+
+SC-B1-05: Login avec compte inexistant
+  Action: Entrer email non inscrit
+  Attendu: Message "compte non trouve"
+  Priorite: HAUTE
+
+SC-B1-06: Deconnexion
+  Action: Cliquer sur deconnexion
+  Attendu: Token supprime, retour a l'ecran login
+  Priorite: HAUTE
+
+SC-B1-07: Session expiree
+  Action: Attendre expiration du token
+  Attendu: Redirection vers login avec message
+  Priorite: HAUTE
+
+SC-B1-08: Inscription avec email deja utilise
+  Action: Tenter inscription avec email existant
+  Attendu: Erreur "email deja utilise"
+  Priorite: HAUTE
+
+
+B2. VERIFICATION IDENTITE CONDUCTEUR
+-------------------------------------
+SC-B2-01: Prise de photo selfie pour verification
+  Action: Ouvrir camera, prendre selfie
+  Attendu: Photo capturee, envoyee a /api/driver-verify
+  Priorite: CRITIQUE
+
+SC-B2-02: Comparaison selfie vs photo profil
+  Action: Prendre selfie, comparer avec photo d'inscription
+  Attendu: match=true si meme personne
+  Priorite: CRITIQUE
+
+SC-B2-03: Verification anti-spoof du conducteur
+  Action: Prendre selfie, verifier liveness
+  Attendu: is_real=true pour vrai selfie
+  Priorite: CRITIQUE
+
+SC-B2-04: Verification age >= 18 du conducteur
+  Action: Analyser age du conducteur
+  Attendu: age >= 18, overall_pass=true
+  Priorite: CRITIQUE
+
+SC-B2-05: Refus si photo d'ecran utilisee
+  Action: Montrer photo d'ecran a la camera
+  Attendu: is_real=false, verification echouee
+  Priorite: CRITIQUE
+
+SC-B2-06: Refus si personne differente
+  Action: Autre personne prend le selfie
+  Attendu: match=false, verification echouee
+  Priorite: CRITIQUE
+
+SC-B2-07: Verification dans conditions de faible luminosite
+  Action: Prendre selfie dans le noir
+  Attendu: Message "eclairage insuffisant" ou detection echouee proprement
+  Priorite: HAUTE
+
+SC-B2-08: Verification avec camera arriere (mauvais usage)
+  Action: Essayer verification avec camera arriere
+  Attendu: Message "utilisez la camera frontale"
+  Priorite: HAUTE
+
+
+B3. VERIFICATION PASSAGER
+--------------------------
+SC-B3-01: Detection des occupants dans le vehicule
+  Action: Photo interieur vehicule
+  Attendu: Comptage correct des occupants
+  Priorite: HAUTE
+
+SC-B3-02: Passager unique
+  Action: Photo avec 1 passager
+  Attendu: occupant_count=1
+  Priorite: HAUTE
+
+SC-B3-03: Plusieurs passagers
+  Action: Photo avec 3 passagers
+  Attendu: occupant_count >= 3
+  Priorite: HAUTE
+
+SC-B3-04: Vehicule vide (pas de passager visible)
+  Action: Photo siege vide
+  Attendu: occupant_count=0 ou erreur
+  Priorite: HAUTE
+
+
+B4. COURSE / TRAJET
+--------------------
+SC-B4-01: Demande de course (passager)
+  Action: Entrer destination, confirmer
+  Attendu: Recherche de conducteur, estimation prix/temps
+  Priorite: CRITIQUE
+
+SC-B4-02: Accepter une course (conducteur)
+  Action: Recevoir notification, accepter
+  Attendu: Course assignee, navigation lancee
+  Priorite: CRITIQUE
+
+SC-B4-03: Refuser une course (conducteur)
+  Action: Recevoir notification, refuser
+  Attendu: Course redistribuee a un autre conducteur
+  Priorite: HAUTE
+
+SC-B4-04: Annulation course par passager
+  Action: Annuler avant depart
+  Attendu: Course annulee, notification au conducteur
+  Priorite: HAUTE
+
+SC-B4-05: Annulation course par conducteur
+  Action: Annuler apres acceptation
+  Attendu: Passager notifie, nouveau conducteur recherche
+  Priorite: HAUTE
+
+SC-B4-06: Trip Safety Score pendant la course
+  Action: Photo periodique pendant le trajet
+  Attendu: safety_score calcule (0-100)
+  Priorite: HAUTE
+
+SC-B4-07: Fin de course et paiement
+  Action: Arrivee a destination
+  Attendu: Course terminee, paiement traite, recapitulatif
+  Priorite: CRITIQUE
+
+SC-B4-08: Course sans internet (mode hors ligne)
+  Action: Couper la connexion pendant la course
+  Attendu: Message d'erreur propre, reprise quand connexion retablie
+  Priorite: HAUTE
+
+
+B5. CAMERA & MEDIA
+-------------------
+SC-B5-01: Permission camera au premier lancement
+  Action: Ouvrir la camera pour la premiere fois
+  Attendu: Demande de permission, fonctionnement apres accord
+  Priorite: CRITIQUE
+
+SC-B5-02: Permission camera refusee
+  Action: Refuser la permission camera
+  Attendu: Message expliquant pourquoi la camera est necessaire
+  Priorite: HAUTE
+
+SC-B5-03: Basculer camera frontale/arriere
+  Action: Switcher entre cameras
+  Attendu: Transition fluide, pas de crash
+  Priorite: HAUTE
+
+SC-B5-04: Photo avec flash
+  Action: Prendre photo avec flash active
+  Attendu: Photo correctement exposee
+  Priorite: MOYENNE
+
+SC-B5-05: Permission microphone (pour voice-gender)
+  Action: Ouvrir l'enregistrement vocal
+  Attendu: Demande de permission, fonctionnement apres accord
+  Priorite: HAUTE
+
+SC-B5-06: Enregistrement vocal pour verification genre
+  Action: Enregistrer 3 secondes de voix
+  Attendu: Audio envoye a /api/voice-gender, resultat affiche
+  Priorite: HAUTE
+
+
+B6. INTERFACE UTILISATEUR
+--------------------------
+SC-B6-01: Ecran de chargement au demarrage
+  Action: Ouvrir l'app
+  Attendu: Splash screen, chargement des donnees
+  Priorite: HAUTE
+
+SC-B6-02: Navigation entre onglets
+  Action: Naviguer dans l'app
+  Attendu: Transitions fluides, pas de lag
+  Priorite: HAUTE
+
+SC-B6-03: Mode portrait uniquement
+  Action: Tourner le telephone en paysage
+  Attendu: L'app reste en portrait (ou s'adapte proprement)
+  Priorite: MOYENNE
+
+SC-B6-04: Dark mode / Light mode
+  Action: Changer le theme du systeme
+  Attendu: L'app s'adapte au theme
+  Priorite: BASSE
+
+SC-B6-05: Taille de police systeme grande
+  Action: Augmenter la taille de police dans les parametres systeme
+  Attendu: Les textes restent lisibles, pas de debordement
+  Priorite: MOYENNE
+
+SC-B6-06: Clavier ne cache pas les champs
+  Action: Appuyer sur un champ de saisie
+  Attendu: Le champ est visible au-dessus du clavier
+  Priorite: HAUTE
+
+
+================================================================================
+C. TESTS INTEGRATION (APP + API)
+================================================================================
+
+SC-C-01: Flow complet inscription -> verification -> course
+  Etapes:
+  1. Inscription conducteur avec photo profil
+  2. Login
+  3. Verification identite (selfie vs profil)
+  4. Verification age >= 18
+  5. Verification anti-spoof
+  6. Mise en disponibilite
+  7. Reception et acceptation course
+  8. Trip safety pendant la course
+  9. Fin de course
+  Attendu: Flow complet sans erreur
+  Priorite: CRITIQUE
+
+SC-C-02: Flow passager complet
+  Etapes:
+  1. Inscription passager
+  2. Login
+  3. Demande de course
+  4. Verification passager (photo dans vehicule)
+  5. Course en cours
+  6. Fin et paiement
+  Attendu: Flow complet sans erreur
+  Priorite: CRITIQUE
+
+SC-C-03: API down pendant utilisation
+  Action: Couper le serveur face-api pendant une verification
+  Attendu: Message d'erreur propre, retry automatique
+  Priorite: HAUTE
+
+SC-C-04: API lente (timeout)
+  Action: Simuler une latence de 30 secondes
+  Attendu: Timeout propre, message a l'utilisateur
+  Priorite: HAUTE
+
+SC-C-05: Upload image trop grande (>10MB)
+  Action: Envoyer une image 4K non compressee
+  Attendu: Compression cote app ou erreur 413
+  Priorite: HAUTE
+
+SC-C-06: Plusieurs verifications consecutives
+  Action: Faire 10 verifications d'identite a la suite
+  Attendu: Toutes reussissent, pas de memory leak
+  Priorite: HAUTE
+
+SC-C-07: Changement de reseau pendant upload
+  Action: Switcher WiFi -> 4G pendant envoi photo
+  Attendu: Retry automatique ou message d'erreur
+  Priorite: HAUTE
+
+
+================================================================================
+D. TESTS DE PERFORMANCE & CHARGE
+================================================================================
+
+SC-D-01: Temps de reponse /api/detect < 2 secondes
+  Action: Mesurer le temps de 100 requetes /api/detect
+  Attendu: Moyenne < 2s, P95 < 5s
+  Priorite: HAUTE
+
+SC-D-02: Temps de reponse /api/compare < 3 secondes
+  Action: Mesurer le temps de 50 requetes /api/compare
+  Attendu: Moyenne < 3s, P95 < 7s
+  Priorite: HAUTE
+
+SC-D-03: Temps de reponse /api/analyze < 5 secondes
+  Action: Mesurer le temps de 30 requetes /api/analyze
+  Attendu: Moyenne < 5s, P95 < 10s
+  Priorite: HAUTE
+
+SC-D-04: 10 requetes concurrentes
+  Action: Envoyer 10 requetes en parallele
+  Attendu: Toutes repondent < 10s, pas d'erreur
+  Priorite: HAUTE
+
+SC-D-05: 50 requetes concurrentes
+  Action: Envoyer 50 requetes en parallele
+  Attendu: Degradation gracieuse, pas de crash
+  Priorite: MOYENNE
+
+SC-D-06: Memoire du container apres 1000 requetes
+  Action: Envoyer 1000 requetes sequentielles
+  Attendu: Memoire stable (pas de fuite), < 4GB
+  Priorite: HAUTE
+
+SC-D-07: Demarrage a froid du container
+  Action: docker compose restart, mesurer temps avant API disponible
+  Attendu: < 3 minutes pour 13/13 modeles charges
+  Priorite: HAUTE
+
+
+================================================================================
+E. TESTS DE SECURITE
+================================================================================
+
+SC-E-01: API sans cle rejete
+  Action: Appeler /api/detect sans header X-API-Key
+  Attendu: 401 Unauthorized
+  Priorite: CRITIQUE
+
+SC-E-02: API avec fausse cle rejete
+  Action: Appeler /api/detect avec cle invalide
+  Attendu: 401 ou 403
+  Priorite: CRITIQUE
+
+SC-E-03: Injection SQL dans le login
+  Action: POST /api/auth/login avec password="' OR 1=1 --"
+  Attendu: Erreur d'authentification, pas d'acces
+  Priorite: CRITIQUE
+
+SC-E-04: Upload de fichier malveillant
+  Action: Envoyer un fichier .exe renomme en .jpg
+  Attendu: Erreur "format invalide" ou traitement sans execution
+  Priorite: CRITIQUE
+
+SC-E-05: Rate limiting
+  Action: Envoyer 100 requetes en 1 seconde
+  Attendu: 429 Too Many Requests apres le seuil
+  Priorite: HAUTE
+
+SC-E-06: CORS headers
+  Action: Verifier Access-Control-Allow-Origin
+  Attendu: CORS configure correctement pour l'app mobile
+  Priorite: HAUTE
+
+SC-E-07: HTTPS en production
+  Action: Acceder a l'API en HTTP (non HTTPS)
+  Attendu: Redirection vers HTTPS
+  Priorite: CRITIQUE (en production)
+
+SC-E-08: Donnees sensibles dans les logs
+  Action: Verifier les logs apres utilisation
+  Attendu: Pas de mots de passe, cles API, ou embeddings dans les logs
+  Priorite: HAUTE
+
+
+================================================================================
+RESUME DES SCENARIOS
+================================================================================
+
+Total scenarios: 107
+
+Par priorite:
+  CRITIQUE: 32
+  HAUTE:    52
+  MOYENNE:  15
+  BASSE:     8
+
+Par categorie:
+  A. Tests IA (API):          55
+  B. Tests App Mobile:        32
+  C. Tests Integration:        7
+  D. Tests Performance:        7
+  E. Tests Securite:           8
+
+================================================================================
+COMMENT EXECUTER LES TESTS IA
+================================================================================
+
+1. Telecharger les images de test:
+   cd gowithsally-face-api
+   .\test\download_test_assets.ps1
+
+2. Lancer les tests automatises:
+   docker exec gws-face-api python /app/test/run_all_tests.py --verbose
+
+3. Lancer un test specifique:
+   docker exec gws-face-api python /app/test/run_all_tests.py -s detect
+   docker exec gws-face-api python /app/test/run_all_tests.py -s gender
+   docker exec gws-face-api python /app/test/run_all_tests.py -s age
+
+4. Voir les resultats:
+   Les resultats JSON sont dans test/results/
+
+================================================================================
+FIN DES SCENARIOS
+================================================================================

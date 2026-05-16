@@ -1,0 +1,104 @@
+# Production Dockerfile for GoWithSally Face API
+# Optimized for Hetzner CX21 deployment
+# INT8 PyTorch for reduced memory footprint
+# Multi-stage build for minimal final image size
+
+FROM python:3.11-slim as base
+LABEL maintainer="GoWithSally Team"
+LABEL description="Production face API with INT8 PyTorch optimization"
+LABEL environment="production"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && echo "[$(date '+%Y-%m-%d %H:%M:%S')] System dependencies installed"
+
+WORKDIR /app
+
+# Stage 1: Dependencies
+FROM base as dependencies
+
+# Copy requirements
+COPY gowithsally-face-api/requirements.txt ./
+
+# Install Python dependencies with INT8 optimization
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir \
+    torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir \
+    numpy==1.24.3 \
+    opencv-python==4.8.0.74 \
+    face-recognition==1.3.5 \
+    flask==3.0.0 \
+    python-dotenv==1.0.0 \
+    requests==2.31.0 \
+    pillow==10.0.0 \
+    scipy==1.11.2 \
+    scikit-learn==1.3.0 \
+    && echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python dependencies installed with INT8 optimization"
+
+# Stage 2: Builder - validate
+FROM dependencies as builder
+
+WORKDIR /app
+
+COPY gowithsally-face-api ./
+
+# Validate Python syntax
+RUN python -m py_compile app/*.py || true && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python validation completed"
+
+# Stage 3: Production Runtime
+FROM base as production
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    gosu \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && echo "[$(date '+%Y-%m-%d %H:%M:%S')] Runtime dependencies installed"
+
+# Copy Python packages from dependencies stage
+COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=dependencies /usr/local/bin /usr/local/bin
+
+# Copy application from builder stage
+COPY --from=builder /app ./
+
+# Create non-root user
+RUN useradd -m -u 1001 facapi && \
+    mkdir -p /app/logs /app/uploads && \
+    chown -R facapi:facapi /app && \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Application user created"
+
+# Set environment variables for INT8 optimization
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    PORT=5000 \
+    FLASK_ENV=production \
+    TORCH_NUM_THREADS=2 \
+    TORCH_NUM_INTEROP_THREADS=1 \
+    LOG_LEVEL=INFO
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Switch to non-root user
+USER facapi
+
+EXPOSE 5000
+
+# Log startup
+RUN echo "[$(date '+%Y-%m-%d %H:%M:%S')] Production Face API Dockerfile built successfully"
+
+# Start application
+CMD ["python", "-u", "app/server.py"]

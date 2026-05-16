@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - GoWithSally AI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            display: flex;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        .login-card {
+            background: linear-gradient(135deg, #0f1229 0%, #1a1f3a 100%);
+            border: 1px solid #8b5cf6;
+            border-radius: 16px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3), 0 0 40px rgba(236, 72, 153, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-logo {
+            font-size: 48px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .login-title {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .login-subtitle {
+            font-size: 13px;
+            color: #808080;
+            margin-top: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #8b5cf6;
+            margin-bottom: 10px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid #8b5cf6;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #06b6d4;
+            background: rgba(6, 182, 212, 0.1);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: #606060;
+        }
+
+        .login-hint {
+            font-size: 12px;
+            color: #808080;
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: rgba(139, 92, 246, 0.05);
+            border-left: 2px solid #ec4899;
+            border-radius: 4px;
+        }
+
+        .login-hint-title {
+            font-weight: 600;
+            color: #ec4899;
+            margin-bottom: 4px;
+        }
+
+        .login-hint-text {
+            font-family: 'Courier New', monospace;
+            color: #06b6d4;
+            letter-spacing: 0.5px;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(139, 92, 246, 0.4);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            display: none;
+            padding: 12px 16px;
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid #f43f5e;
+            border-radius: 8px;
+            color: #f43f5e;
+            font-size: 13px;
+            margin-bottom: 20px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid #06b6d4;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #06b6d4;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #06b6d4;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background-color: #f43f5e;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <!-- Header -->
+            <div class="login-header">
+                <div class="login-logo">
+                    <i class="fas fa-face-smile"></i>
+                </div>
+                <div class="login-title">GoWithSally AI</div>
+                <div class="login-subtitle">Studio d'authentification</div>
+            </div>
+
+            <!-- Error Message -->
+            <div class="error-message" id="error-message"></div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <!-- Password Field -->
+                <div class="form-group">
+                    <label class="form-label" for="password">Mot de passe</label>
+                    <input
+                        type="password"
+                        id="password"
+                        class="form-input"
+                        placeholder="Entrez votre mot de passe"
+                        autocomplete="off"
+                        required
+                    >
+                    <div class="login-hint">
+                        <div class="login-hint-title">Indice:</div>
+                        <div class="login-hint-text">Mot de passe: sally2024</div>
+                    </div>
+                </div>
+
+                <!-- Login Button -->
+                <button type="submit" class="login-btn" id="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Connexion
+                </button>
+            </form>
+
+            <!-- Status Indicator -->
+            <div class="status-indicator" id="status-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span class="status-text" id="status-text">Vérification du serveur...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '';
+
+        // Initialize
+        window.addEventListener('load', () => {
+            initializeLogin();
+        });
+
+        function initializeLogin() {
+            // Check if already logged in
+            const apiKey = sessionStorage.getItem('face_api_key');
+            if (apiKey) {
+                window.location.href = '/studio';
+                return;
+            }
+
+            // Setup form
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+            // Check server status
+            checkServerStatus();
+            // Check every 3 seconds
+            setInterval(checkServerStatus, 3000);
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('login-btn');
+            const errorMsg = document.getElementById('error-message');
+
+            // Clear error
+            errorMsg.classList.remove('show');
+
+            // Validate
+            if (!password) {
+                showError('Veuillez entrer votre mot de passe');
+                return;
+            }
+
+            // Disable button and show spinner
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-spinner"></span> Connexion en cours...';
+
+            try {
+                // Create FormData with correct field name
+                const formData = new FormData();
+                formData.append('password', password);
+
+                // Make login request
+                const response = await fetch(API_BASE_URL + '/api/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Erreur d\'authentification');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Connexion';
+                    return;
+                }
+
+                // Store API key
+                if (data.api_key) {
+                    sessionStorage.setItem('face_api_key', data.api_key);
+                    // Redirect to studio
+                    window.location.href = '/studio';
+                } else {
+                    showError('Clé API non reçue');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Connexion';
+                }
+            } catch (error) {
+                showError('Erreur réseau: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Connexion';
+            }
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('error-message');
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+        }
+
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(API_BASE_URL + '/api/health/ping', {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    updateStatusOnline();
+                } else {
+                    updateStatusOffline();
+                }
+            } catch (error) {
+                updateStatusOffline();
+            }
+        }
+
+        function updateStatusOnline() {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            dot.classList.remove('offline');
+            text.textContent = 'Serveur en ligne';
+        }
+
+        function updateStatusOffline() {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            dot.classList.add('offline');
+            text.textContent = 'Serveur hors ligne';
+        }
+    </script>
+</body>
+</html>

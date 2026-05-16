@@ -1,0 +1,673 @@
+---
+- name: Setup Monitoring and Observability
+  hosts: "{{ monitoring_target | default('all') }}"
+  become: yes
+  gather_facts: yes
+
+  vars:
+    prometheus_version: "2.45.1"
+    grafana_version: "10.2.0"
+    alertmanager_version: "0.26.0"
+    logstash_version: "8.10.2"
+    elasticsearch_version: "8.10.2"
+    kibana_version: "8.10.2"
+    prometheus_retention: "30d"
+    prometheus_scrape_interval: "15s"
+    alertmanager_slack_webhook: "{{ vault_slack_webhook_url }}"
+    alertmanager_pagerduty_key: "{{ vault_pagerduty_integration_key }}"
+
+  pre_tasks:
+    - name: Verify required Python modules
+      pip:
+        name:
+          - requests
+          - pyyaml
+          - jinja2
+        state: present
+
+  tasks:
+    # Prometheus Installation
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        shell: /bin/bash
+        home: /var/lib/prometheus
+        createhome: yes
+        state: present
+
+    - name: Create Prometheus directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+      loop:
+        - /etc/prometheus
+        - /var/lib/prometheus
+        - /var/lib/prometheus/rules
+        - /var/lib/prometheus/wal
+
+    - name: Download Prometheus
+      get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: /tmp/prometheus.tar.gz
+        timeout: 60
+
+    - name: Extract Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /tmp
+        remote_src: yes
+
+    - name: Install Prometheus binaries
+      shell: |
+        cp /tmp/prometheus-{{ prometheus_version }}.linux-amd64/prometheus /usr/local/bin/
+        cp /tmp/prometheus-{{ prometheus_version }}.linux-amd64/promtool /usr/local/bin/
+        chown -R prometheus:prometheus /usr/local/bin/prometheus /usr/local/bin/promtool
+
+    - name: Create Prometheus configuration
+      template:
+        src: prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Create Prometheus alert rules
+      copy:
+        content: |
+          groups:
+            - name: gowithsally
+              interval: 30s
+              rules:
+                - alert: InstanceDown
+                  expr: up == 0
+                  for: 1m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Instance {{ $labels.instance }} down"
+                    description: "{{ $labels.instance }} has been down for more than 1 minute."
+
+                - alert: HighMemoryUsage
+                  expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "High memory usage on {{ $labels.instance }}"
+                    description: "Memory usage is {{ $value | humanizePercentage }}"
+
+                - alert: HighCPUUsage
+                  expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "High CPU usage on {{ $labels.instance }}"
+                    description: "CPU usage is {{ $value | humanizePercentage }}"
+
+                - alert: DiskSpaceRunningOut
+                  expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "Low disk space on {{ $labels.instance }}"
+                    description: "{{ $value | humanizePercentage }} disk space remaining"
+
+                - alert: DockerContainerDown
+                  expr: up{job="docker"} == 0
+                  for: 2m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Docker container down: {{ $labels.container_name }}"
+
+                - alert: ApplicationErrorRate
+                  expr: |
+                    (
+                      sum(rate(http_request_duration_seconds_bucket{le="+Inf", job="gowithsally-app", status=~"5.."}[5m]))
+                      /
+                      sum(rate(http_request_duration_seconds_bucket{le="+Inf", job="gowithsally-app"}[5m]))
+                    ) > 0.05
+                  for: 2m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "High error rate in GoWithSally application"
+                    description: "Error rate is {{ $value | humanizePercentage }}"
+
+                - alert: DatabaseConnectionPoolExhausted
+                  expr: mongodb_connections_current / mongodb_connections_available > 0.9
+                  for: 2m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "MongoDB connection pool nearly exhausted"
+                    description: "{{ $value | humanizePercentage }} of connections in use"
+
+                - alert: RedisMemoryUsageHigh
+                  expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "Redis memory usage high on {{ $labels.instance }}"
+                    description: "{{ $value | humanizePercentage }} of memory in use"
+
+                - alert: DeploymentFailure
+                  expr: deployment_failures_total > 0
+                  for: 1m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Recent deployment failure detected"
+        dest: /etc/prometheus/rules.yml
+        owner: prometheus
+        group: prometheus
+      notify: reload prometheus
+
+    - name: Create Prometheus systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Prometheus Monitoring System
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=prometheus
+          Group=prometheus
+          Type=simple
+          ExecStart=/usr/local/bin/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path=/var/lib/prometheus \
+            --storage.tsdb.retention.time={{ prometheus_retention }} \
+            --web.console.templates=/etc/prometheus/consoles \
+            --web.console.libraries=/etc/prometheus/console_libraries
+
+          Restart=always
+          RestartSec=10s
+
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=prometheus
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/prometheus.service
+      notify: reload systemd
+
+    - name: Enable and start Prometheus
+      systemd:
+        name: prometheus
+        state: started
+        enabled: yes
+
+    # Alertmanager Installation
+    - name: Create Alertmanager user
+      user:
+        name: alertmanager
+        shell: /bin/bash
+        home: /var/lib/alertmanager
+        createhome: yes
+        state: present
+
+    - name: Download Alertmanager
+      get_url:
+        url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.linux-amd64.tar.gz"
+        dest: /tmp/alertmanager.tar.gz
+        timeout: 60
+
+    - name: Extract and install Alertmanager
+      shell: |
+        cd /tmp
+        tar xzf alertmanager.tar.gz
+        cp alertmanager-{{ alertmanager_version }}.linux-amd64/alertmanager /usr/local/bin/
+        cp alertmanager-{{ alertmanager_version }}.linux-amd64/amtool /usr/local/bin/
+        chown -R alertmanager:alertmanager /usr/local/bin/alertmanager /usr/local/bin/amtool
+
+    - name: Create Alertmanager configuration
+      copy:
+        content: |
+          global:
+            resolve_timeout: 5m
+            slack_api_url: '{{ alertmanager_slack_webhook }}'
+            pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+          route:
+            group_by: ['alertname', 'cluster', 'service']
+            group_wait: 10s
+            group_interval: 10s
+            repeat_interval: 12h
+            receiver: 'default'
+            routes:
+              - match:
+                  severity: critical
+                receiver: 'critical'
+                continue: true
+              - match:
+                  severity: warning
+                receiver: 'warning'
+              - match:
+                  alertname: DeploymentFailure
+                receiver: 'deployment'
+
+          receivers:
+            - name: 'default'
+              slack_configs:
+                - channel: '#monitoring'
+                  title: 'GoWithSally Alert'
+                  text: '{{ "{{ .GroupLabels.alertname }}" }} - {{ "{{ .GroupLabels.severity }}" }}'
+
+            - name: 'critical'
+              slack_configs:
+                - channel: '#critical-alerts'
+                  title: 'CRITICAL: {{ "{{ .GroupLabels.alertname }}" }}'
+                  text: '{{ "{{ range .Alerts }}" }}{{ "{{ .Annotations.description }}" }}\n{{ "{{ end }}" }}'
+              pagerduty_configs:
+                - service_key: '{{ alertmanager_pagerduty_key }}'
+
+            - name: 'warning'
+              slack_configs:
+                - channel: '#warnings'
+                  title: 'WARNING: {{ "{{ .GroupLabels.alertname }}" }}'
+
+            - name: 'deployment'
+              slack_configs:
+                - channel: '#deployments'
+                  title: 'Deployment Alert'
+                  text: 'Deployment failure detected!'
+
+          inhibit_rules:
+            - source_match:
+                severity: 'critical'
+              target_match:
+                severity: 'warning'
+              equal: ['alertname', 'dev', 'instance']
+        dest: /etc/prometheus/alertmanager.yml
+        owner: alertmanager
+        group: alertmanager
+      notify: restart alertmanager
+
+    - name: Create Alertmanager systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Prometheus Alertmanager
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=alertmanager
+          Group=alertmanager
+          Type=simple
+          ExecStart=/usr/local/bin/alertmanager \
+            --config.file=/etc/prometheus/alertmanager.yml \
+            --storage.path=/var/lib/alertmanager \
+            --web.external-url=http://{{ ansible_default_ipv4.address }}:9093
+
+          Restart=always
+          RestartSec=10s
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/alertmanager.service
+      notify: reload systemd
+
+    - name: Enable and start Alertmanager
+      systemd:
+        name: alertmanager
+        state: started
+        enabled: yes
+
+    # Grafana Installation
+    - name: Add Grafana repository key
+      apt_key:
+        url: https://apt.grafana.com/gpg.key
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb https://apt.grafana.com stable main"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Grafana
+      apt:
+        name: grafana-server
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create Grafana provisioning directories
+      file:
+        path: "/etc/grafana/provisioning/{{ item }}"
+        state: directory
+        owner: grafana
+        group: grafana
+        mode: '0755'
+      loop:
+        - dashboards
+        - datasources
+
+    - name: Configure Prometheus datasource in Grafana
+      copy:
+        content: |
+          apiVersion: 1
+
+          datasources:
+            - name: Prometheus
+              type: prometheus
+              access: proxy
+              url: http://localhost:9090
+              isDefault: true
+              editable: true
+        dest: /etc/grafana/provisioning/datasources/prometheus.yml
+        owner: grafana
+        group: grafana
+      notify: restart grafana-server
+
+    - name: Enable and start Grafana
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: yes
+
+    # ELK Stack Installation
+    - name: Install Elasticsearch
+      block:
+        - name: Create elasticsearch user
+          user:
+            name: elasticsearch
+            shell: /bin/bash
+            home: /var/lib/elasticsearch
+            createhome: yes
+            state: present
+
+        - name: Create Elasticsearch directories
+          file:
+            path: "{{ item }}"
+            state: directory
+            owner: elasticsearch
+            group: elasticsearch
+            mode: '0755'
+          loop:
+            - /var/lib/elasticsearch
+            - /var/log/elasticsearch
+            - /etc/elasticsearch
+
+        - name: Download Elasticsearch
+          get_url:
+            url: "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-{{ elasticsearch_version }}-linux-x86_64.tar.gz"
+            dest: /tmp/elasticsearch.tar.gz
+            timeout: 120
+
+        - name: Extract Elasticsearch
+          unarchive:
+            src: /tmp/elasticsearch.tar.gz
+            dest: /opt
+            remote_src: yes
+            owner: elasticsearch
+            group: elasticsearch
+
+        - name: Create Elasticsearch systemd service
+          copy:
+            content: |
+              [Unit]
+              Description=Elasticsearch
+              Documentation=https://www.elastic.co
+              Wants=network-online.target
+              After=network-online.target
+
+              [Service]
+              Type=notify
+              User=elasticsearch
+              Group=elasticsearch
+              ExecStart=/opt/elasticsearch-{{ elasticsearch_version }}/bin/elasticsearch
+              Restart=on-failure
+              RestartSec=5s
+
+              StandardOutput=journal
+              StandardError=journal
+
+              [Install]
+              WantedBy=multi-user.target
+            dest: /etc/systemd/system/elasticsearch.service
+          notify: reload systemd
+
+    - name: Enable and start Elasticsearch
+      systemd:
+        name: elasticsearch
+        state: started
+        enabled: yes
+
+    # Logstash Installation and Configuration
+    - name: Create Logstash directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/logstash
+        - /var/lib/logstash
+        - /var/log/logstash
+
+    - name: Download Logstash
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/logstash/logstash-{{ logstash_version }}-linux-x86_64.tar.gz"
+        dest: /tmp/logstash.tar.gz
+        timeout: 120
+
+    - name: Extract Logstash
+      unarchive:
+        src: /tmp/logstash.tar.gz
+        dest: /opt
+        remote_src: yes
+
+    - name: Create Logstash pipeline configuration
+      copy:
+        content: |
+          input {
+            tcp {
+              port => 5000
+              codec => "json"
+            }
+            file {
+              path => "{{ log_dir }}/gowithsally*.log"
+              start_position => "beginning"
+              codec => multiline {
+                pattern => "^\[%{TIMESTAMP_ISO8601}\]"
+                negate => true
+                what => "previous"
+              }
+            }
+          }
+
+          filter {
+            if [type] == "application" {
+              grok {
+                match => { "message" => "\[%{TIMESTAMP_ISO8601:timestamp}\] %{LOGLEVEL:level} %{GREEDYDATA:message}" }
+              }
+              mutate {
+                remove_field => [ "host", "@version" ]
+                add_field => { "service" => "gowithsally" }
+                add_field => { "environment" => "{{ environment | default('unknown') }}" }
+              }
+            }
+          }
+
+          output {
+            elasticsearch {
+              hosts => ["localhost:9200"]
+              index => "gowithsally-%{+YYYY.MM.dd}"
+            }
+            stdout { codec => rubydebug }
+          }
+        dest: /etc/logstash/pipelines.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create Logstash systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Logstash
+          After=network.target elasticsearch.service
+
+          [Service]
+          Type=simple
+          ExecStart=/opt/logstash-{{ logstash_version }}/bin/logstash -f /etc/logstash/pipelines.conf
+          Restart=on-failure
+          RestartSec=10s
+
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/logstash.service
+      notify: reload systemd
+
+    - name: Enable and start Logstash
+      systemd:
+        name: logstash
+        state: started
+        enabled: yes
+
+    # Kibana Installation
+    - name: Download Kibana
+      get_url:
+        url: "https://artifacts.elastic.co/downloads/kibana/kibana-{{ kibana_version }}-linux-x86_64.tar.gz"
+        dest: /tmp/kibana.tar.gz
+        timeout: 120
+
+    - name: Extract Kibana
+      unarchive:
+        src: /tmp/kibana.tar.gz
+        dest: /opt
+        remote_src: yes
+
+    - name: Create Kibana systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Kibana
+          After=network.target elasticsearch.service
+
+          [Service]
+          Type=simple
+          ExecStart=/opt/kibana-{{ kibana_version }}-linux-x86_64/bin/kibana
+          Restart=on-failure
+          RestartSec=10s
+
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/kibana.service
+      notify: reload systemd
+
+    - name: Enable and start Kibana
+      systemd:
+        name: kibana
+        state: started
+        enabled: yes
+
+    # Backup Configuration
+    - name: Create backup scripts
+      copy:
+        content: |
+          #!/bin/bash
+          # Automated backup script
+          BACKUP_DIR="{{ backup_dir }}"
+          RETENTION_DAYS=30
+
+          echo "[$(date)] Starting database backups..." >> {{ log_dir }}/backups.log
+
+          # MongoDB backup
+          docker exec gowithsally-db mongodump --out $BACKUP_DIR/mongo_$(date +%Y%m%d_%H%M%S) 2>> {{ log_dir }}/backups.log
+
+          # Redis backup
+          docker exec gowithsally-redis redis-cli BGSAVE 2>> {{ log_dir }}/backups.log
+
+          # Elasticsearch backup
+          curl -X PUT "localhost:9200/_snapshot/s3_backup" -H "Content-Type: application/json" -d '{
+            "type": "s3",
+            "settings": {
+              "bucket": "gowithsally-backups",
+              "region": "us-east-1"
+            }
+          }' 2>> {{ log_dir }}/backups.log
+
+          # Clean old backups
+          find $BACKUP_DIR -type d -mtime +$RETENTION_DAYS -exec rm -rf {} + 2>> {{ log_dir }}/backups.log
+
+          echo "[$(date)] Backup completed" >> {{ log_dir }}/backups.log
+        dest: /usr/local/bin/backup-databases.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create backup cron job
+      cron:
+        name: "GoWithSally Database Backups"
+        minute: "0"
+        hour: "2"
+        job: "/usr/local/bin/backup-databases.sh"
+        user: root
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+
+    - name: reload prometheus
+      shell: kill -HUP $(pgrep prometheus)
+      ignore_errors: yes
+
+    - name: restart alertmanager
+      systemd:
+        name: alertmanager
+        state: restarted
+
+    - name: restart grafana-server
+      systemd:
+        name: grafana-server
+        state: restarted
+
+  post_tasks:
+    - name: Verify monitoring stack is running
+      uri:
+        url: "http://localhost:{{ item.port }}/{{ item.path | default('') }}"
+        status_code: 200
+      register: health_checks
+      until: health_checks is success
+      retries: 10
+      delay: 5
+      loop:
+        - { port: 9090, path: '/-/healthy' }
+        - { port: 9093, path: '/-/healthy' }
+        - { port: 3000, path: '/api/health' }
+        - { port: 5601, path: '/api/status' }
+
+    - name: Create monitoring access summary
+      debug:
+        msg:
+          - "Prometheus: http://{{ ansible_default_ipv4.address }}:9090"
+          - "Alertmanager: http://{{ ansible_default_ipv4.address }}:9093"
+          - "Grafana: http://{{ ansible_default_ipv4.address }}:3000 (admin/admin)"
+          - "Kibana: http://{{ ansible_default_ipv4.address }}:5601"
+          - "Elasticsearch: http://{{ ansible_default_ipv4.address }}:9200"

@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoWithSally - Documentation API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: #0f0f23;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a35 100%);
+            border-bottom: 2px solid #FF69B4;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        .logo-section h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #FF69B4, #ff1493);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.6rem 1rem;
+            border: 2px solid #FF69B4;
+            border-radius: 6px;
+            background-color: rgba(255, 105, 180, 0.1);
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input::placeholder {
+            color: #888;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background-color: rgba(255, 105, 180, 0.2);
+            box-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+        }
+
+        .header-right {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn-admin {
+            padding: 0.6rem 1.2rem;
+            background: linear-gradient(135deg, #FF69B4, #ff1493);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-admin:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 105, 180, 0.4);
+        }
+
+        /* Main Container */
+        .container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #0f0f23 0%, #1a1a35 100%);
+            border-right: 2px solid #FF69B4;
+            padding: 1.5rem 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #FF69B4;
+            padding: 0.5rem 1.5rem;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .category-btn {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            padding: 0.8rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .category-btn:hover {
+            background-color: rgba(255, 105, 180, 0.1);
+            color: #FF69B4;
+        }
+
+        .category-btn.active {
+            background: linear-gradient(90deg, rgba(255, 105, 180, 0.2), transparent);
+            color: #FF69B4;
+            border-left: 3px solid #FF69B4;
+            padding-left: calc(1.5rem - 3px);
+        }
+
+        .category-icon {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .category-count {
+            margin-left: auto;
+            background-color: rgba(255, 105, 180, 0.3);
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #FF69B4;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background-color: #0f0f23;
+        }
+
+        /* Service Group */
+        .service-group {
+            margin-bottom: 3rem;
+        }
+
+        .service-group-title {
+            font-size: 1.5rem;
+            color: #FF69B4;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid rgba(255, 105, 180, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .service-group-title span {
+            font-size: 0.8rem;
+            background-color: rgba(100, 100, 150, 0.5);
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            color: #aaa;
+        }
+
+        /* Endpoint Card */
+        .endpoint {
+            background: linear-gradient(135deg, #1a1a35 0%, #252550 100%);
+            border: 1px solid rgba(255, 105, 180, 0.2);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        .endpoint.visible {
+            display: block;
+        }
+
+        .endpoint:hover {
+            border-color: #FF69B4;
+            box-shadow: 0 8px 16px rgba(255, 105, 180, 0.2);
+            transform: translateX(4px);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .method-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .method-GET {
+            background-color: rgba(52, 168, 83, 0.3);
+            color: #34a853;
+        }
+
+        .method-POST {
+            background-color: rgba(66, 133, 244, 0.3);
+            color: #4285f4;
+        }
+
+        .method-PUT {
+            background-color: rgba(251, 188, 5, 0.3);
+            color: #fbbc05;
+        }
+
+        .method-DELETE {
+            background-color: rgba(217, 48, 37, 0.3);
+            color: #d93025;
+        }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #e0e0e0;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .tech-badge {
+            padding: 0.3rem 0.7rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .tech-nodejs {
+            background-color: rgba(52, 211, 153, 0.3);
+            color: #34d399;
+        }
+
+        .tech-ml-local {
+            background-color: rgba(168, 85, 247, 0.3);
+            color: #a855f7;
+        }
+
+        .tech-ia-cloud {
+            background-color: rgba(34, 197, 234, 0.3);
+            color: #22c5ee;
+        }
+
+        .tech-admin {
+            background-color: rgba(255, 105, 180, 0.3);
+            color: #FF69B4;
+        }
+
+        .tech-external {
+            background-color: rgba(107, 114, 128, 0.3);
+            color: #9ca3af;
+        }
+
+        .endpoint-description {
+            color: #b0b0b0;
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+        }
+
+        .service-label {
+            display: inline-block;
+            margin-top: 0.75rem;
+            padding: 0.3rem 0.7rem;
+            background-color: rgba(100, 150, 200, 0.2);
+            border-left: 3px solid rgba(100, 150, 200, 0.8);
+            color: #a0c0ff;
+            font-size: 0.8rem;
+            border-radius: 2px;
+        }
+
+        /* No Results */
+        .no-results {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #888;
+        }
+
+        .no-results-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f0f23;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #FF69B4;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ff1493;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 2px solid #FF69B4;
+                padding: 1rem 0;
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                max-height: 80px;
+            }
+
+            .sidebar-section {
+                margin-bottom: 0;
+                margin-right: 2rem;
+                white-space: nowrap;
+            }
+
+            .category-btn {
+                padding: 0.6rem 1rem;
+            }
+
+            .main-content {
+                height: auto;
+                padding: 1.5rem;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .header-left {
+                width: 100%;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .search-container {
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-section">
+                <h1>🚗 GoWithSally - Documentation API</h1>
+            </div>
+            <div class="search-container">
+                <input
+                    type="text"
+                    class="search-input"
+                    id="searchInput"
+                    placeholder="Rechercher un endpoint..."
+                >
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="/admin" class="btn-admin">← Retour Admin</a>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Backend API</div>
+                <button class="category-btn active" data-category="auth">
+                    <span class="category-icon">🔐</span>
+                    Authentification
+                    <span class="category-count">13</span>
+                </button>
+                <button class="category-btn" data-category="rides">
+                    <span class="category-icon">🚗</span>
+                    Courses
+                    <span class="category-count">10</span>
+                </button>
+                <button class="category-btn" data-category="drivers">
+                    <span class="category-icon">👩‍🚗</span>
+                    Conductrices
+                    <span class="category-count">9</span>
+                </button>
+                <button class="category-btn" data-category="users">
+                    <span class="category-icon">👤</span>
+                    Utilisatrices
+                    <span class="category-count">5</span>
+                </button>
+                <button class="category-btn" data-category="services">
+                    <span class="category-icon">🛎️</span>
+                    Services
+                    <span class="category-count">6</span>
+                </button>
+                <button class="category-btn" data-category="pricing">
+                    <span class="category-icon">💰</span>
+                    Tarification
+                    <span class="category-count">5</span>
+                </button>
+                <button class="category-btn" data-category="chat">
+                    <span class="category-icon">💬</span>
+                    Chat
+                    <span class="category-count">6</span>
+                </button>
+                <button class="category-btn" data-category="notifications">
+                    <span class="category-icon">🔔</span>
+                    Notifications
+                    <span class="category-count">5</span>
+                </button>
+                <button class="category-btn" data-category="admin">
+                    <span class="category-icon">⚙️</span>
+                    Administration
+                    <span class="category-count">12</span>
+                </button>
+                <button class="category-btn" data-category="misc">
+                    <span class="category-icon">📦</span>
+                    Autres Services
+                    <span class="category-count">18</span>
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Face AI</div>
+                <button class="category-btn" data-category="face-core">
+                    <span class="category-icon">🧠</span>
+                    Core Models
+                    <span class="category-count">8</span>
+                </button>
+                <button class="category-btn" data-category="face-safety">
+                    <span class="category-icon">🛡️</span>
+                    Sécurité
+                    <span class="category-count">3</span>
+                </button>
+                <button class="category-btn" data-category="face-ai">
+                    <span class="category-icon">☁️</span>
+                    IA Cloud
+                    <span class="category-count">7</span>
+                </button>
+                <button class="category-btn" data-category="face-health">
+                    <span class="category-icon">❤️</span>
+                    Santé
+                    <span class="category-count">3</span>
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Services Externes</div>
+                <button class="category-btn" data-category="external">
+                    <span class="category-icon">🌐</span>
+                    Intégrations
+                    <span class="category-count">4</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Backend API -->
+            <div class="service-group" data-service="backend">
+                <div class="service-group-title">
+                    🔌 Backend API
+                    <span>http://localhost:5000</span>
+                </div>
+
+                <!-- Auth Section -->
+                <div data-category="auth">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🔐 Authentification (/api/auth)
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/register" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/register</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Inscription - Créer un nouveau compte utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/login" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/login</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Connexion - Authentifier un utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/forgot-password" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/forgot-password</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mot de passe oublié - Initier la réinitialisation</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/reset-password" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/reset-password</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Réinitialiser mot de passe - Valider le nouveau mot de passe</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/refresh-token" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/refresh-token</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Rafraîchir token - Obtenir un nouveau JWT token</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="GET" data-path="/api/auth/me" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/auth/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mon profil - Récupérer les infos de l'utilisateur authentifié</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="PUT" data-path="/api/auth/me" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/auth/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Modifier profil - Mettre à jour les infos utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/verify-phone" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/verify-phone</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Vérifier téléphone - Valider le numéro de téléphone avec OTP</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/resend-phone-code" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/resend-phone-code</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Renvoyer code - Renvoyer le code OTP au téléphone</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/verify-face" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/verify-face</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Vérifier visage - Vérification biométrique faciale</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/logout" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/logout</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Déconnexion - Terminer la session utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint visible" data-method="POST" data-path="/api/auth/change-password" data-category="auth">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/auth/change-password</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Changer mot de passe - Changer le mot de passe de l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Rides Section -->
+                <div data-category="rides">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🚗 Courses (/api/rides)
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/request" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/request</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Demander une course - Créer une nouvelle demande de trajet</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/rides/active" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/rides/active</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Course active - Récupérer la course en cours</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/rides/history" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/rides/history</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Historique - Récupérer l'historique des courses</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/rides/estimate" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/rides/estimate</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Estimer prix - Obtenir une estimation du tarif</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/rides/:id" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/rides/:id</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Détails course - Récupérer les détails d'une course spécifique</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/:id/cancel" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/:id/cancel</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Annuler - Annuler une course existante</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/:id/rate" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/:id/rate</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Noter - Laisser un avis et une note sur la course</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/:id/tip" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/:id/tip</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Pourboire - Ajouter un pourboire à une course</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/:id/sos" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/:id/sos</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Alerte SOS - Envoyer une alerte d'urgence</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/rides/:id/share" data-category="rides">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/rides/:id/share</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Partager trajet - Partager les détails du trajet en cours</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Drivers Section -->
+                <div data-category="drivers">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        👩‍🚗 Conductrices (/api/drivers)
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/drivers/me" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/drivers/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mon profil conductrice - Récupérer les infos du profil conducteur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/drivers/status" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/drivers/status</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Statut - Récupérer le statut actuel de la conductrice</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/drivers/online" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/drivers/online</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Passer en ligne - Activer la disponibilité pour recevoir des courses</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/drivers/offline" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/drivers/offline</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Passer hors ligne - Désactiver la disponibilité</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/drivers/toggle-availability" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/drivers/toggle-availability</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Basculer disponibilité - Basculer le statut de disponibilité</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/drivers/location" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/drivers/location</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mettre à jour position - Transmettre la localisation GPS</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/drivers/earnings" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/drivers/earnings</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes revenus - Récupérer les revenus actuels</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/drivers/earnings/history" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/drivers/earnings/history</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Historique revenus - Récupérer l'historique des revenus</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/drivers/withdraw" data-category="drivers">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/drivers/withdraw</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Retrait - Effectuer un retrait de revenus</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Users Section -->
+                <div data-category="users">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        👤 Utilisatrices (/api/users)
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/users/me" data-category="users">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/users/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mon profil - Récupérer le profil utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="PUT" data-path="/api/users/me" data-category="users">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/users/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Modifier profil - Mettre à jour le profil utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/users/stats" data-category="users">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/users/stats</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes statistiques - Récupérer les statistiques de l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/users/emergency-contacts" data-category="users">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/users/emergency-contacts</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Contacts d'urgence - Récupérer la liste des contacts</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/users/saved-places" data-category="users">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/users/saved-places</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Lieux favoris - Récupérer les lieux sauvegardés</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Services Section -->
+                <div data-category="services">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🛎️ Services (/api/services)
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/services" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/services</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Tous les services - Récupérer la liste des services disponibles</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/services/:type" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/services/:type</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Détails service - Récupérer les détails d'un service</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/services/:type/price" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/services/:type/price</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Calculer prix - Calculer le prix pour un service</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/services/user/available" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/services/user/available</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Services disponibles - Récupérer les services disponibles pour l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/services/admin/initialize" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/services/admin/initialize</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Initialiser services - Initialiser les services (Admin)</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="PUT" data-path="/api/services/admin/:type" data-category="services">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/services/admin/:type</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Modifier service - Modifier la configuration d'un service (Admin)</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Pricing Section -->
+                <div data-category="pricing">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        💰 Tarification (/api/pricing)
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/pricing/estimate" data-category="pricing">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/pricing/estimate</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Estimer prix - Obtenir une estimation du tarif</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/pricing/surge" data-category="pricing">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/pricing/surge</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Surge actuel - Récupérer le multiplicateur de surge en cours</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/pricing/services" data-category="pricing">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/pricing/services</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Services & prix - Récupérer les services et leurs tarifs</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/pricing/config" data-category="pricing">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/pricing/config</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Configuration - Récupérer la configuration de tarification</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/pricing/commission" data-category="pricing">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/pricing/commission</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Calculer commission - Calculer la commission de la plateforme</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Chat Section -->
+                <div data-category="chat">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        💬 Chat (/api/chat)
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/chat/conversation" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/chat/conversation</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Créer conversation - Démarrer une nouvelle conversation</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/chat/conversations" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/chat/conversations</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes conversations - Récupérer la liste des conversations</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/chat/messages/:id" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/chat/messages/:id</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Messages - Récupérer les messages d'une conversation</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/chat/messages" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/chat/messages</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Envoyer message - Envoyer un message texte</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/chat/messages/media" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/chat/messages/media</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Envoyer média - Envoyer une image ou vidéo</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/chat/messages/location" data-category="chat">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/chat/messages/location</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Envoyer position - Envoyer la localisation GPS</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Notifications Section -->
+                <div data-category="notifications">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🔔 Notifications (/api/notifications)
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/notifications" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/notifications</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes notifications - Récupérer les notifications de l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/notifications/unread-count" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/notifications/unread-count</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Non lues - Récupérer le nombre de notifications non lues</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="PUT" data-path="/api/notifications/:id/read" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/notifications/:id/read</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Marquer lue - Marquer une notification comme lue</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="PUT" data-path="/api/notifications/read-all" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/notifications/read-all</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Tout marquer lu - Marquer toutes les notifications comme lues</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/notifications/send" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/notifications/send</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Envoyer (Admin) - Envoyer une notification à un utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/notifications/broadcast" data-category="notifications">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/notifications/broadcast</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Broadcast (Admin) - Envoyer une notification à tous les utilisateurs</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Admin Section -->
+                <div data-category="admin">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        ⚙️ Administration (/api/admin)
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/dashboard" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/dashboard</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Stats dashboard - Récupérer les statistiques du tableau de bord</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/users" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/users</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Liste utilisatrices - Récupérer la liste des utilisatrices</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/drivers" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/drivers</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Liste conductrices - Récupérer la liste des conductrices</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/rides" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/rides</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Liste courses - Récupérer la liste de toutes les courses</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/rides/active" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/rides/active</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Courses actives - Récupérer les courses en cours</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/verifications/pending" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/verifications/pending</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Vérifications en attente - Récupérer les vérifications à traiter</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/admin/verifications/:id/approve" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/admin/verifications/:id/approve</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Approuver - Approuver une vérification</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/admin/verifications/:id/reject" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/admin/verifications/:id/reject</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Rejeter - Rejeter une vérification</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/activities" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/activities</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Activités récentes - Récupérer l'historique des activités</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/settings" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/settings</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Paramètres système - Récupérer la configuration système</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="PUT" data-path="/api/admin/settings" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-PUT">PUT</span>
+                            <code class="endpoint-path">/api/admin/settings</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Modifier paramètres - Modifier la configuration système</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/admin/reports/overview" data-category="admin">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/admin/reports/overview</code>
+                            <span class="tech-badge tech-admin">Admin</span>
+                        </div>
+                        <div class="endpoint-description">Rapport global - Récupérer un rapport global</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+
+                <!-- Misc Section -->
+                <div data-category="misc">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        📦 Autres Services
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/badges/all" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/badges/all</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Tous les badges - Récupérer la liste des badges</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/badges/me" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/badges/me</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes badges - Récupérer les badges de l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/badges/refresh" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/badges/refresh</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Actualiser badges - Vérifier les nouveaux badges</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/wallet" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/wallet</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Portefeuille - Récupérer le solde du portefeuille</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/wallet/topup" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/wallet/topup</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Recharger portefeuille - Ajouter des fonds</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/wallet/withdraw" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/wallet/withdraw</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Retirer fonds - Retirer des fonds du portefeuille</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/promotions" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/promotions</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Promotions - Récupérer les promotions actives</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/promotions/apply" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/promotions/apply</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Appliquer promo - Appliquer un code de promotion</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/reviews" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/reviews</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Avis - Récupérer les avis de l'utilisateur</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/reviews" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/reviews</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Laisser avis - Laisser un avis</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/support/ticket" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/support/ticket</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Créer ticket - Créer un ticket d'assistance</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/support/tickets" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/support/tickets</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Mes tickets - Récupérer mes tickets d'assistance</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/faq" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/faq</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">FAQ - Récupérer les questions fréquentes</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/loyalty/points" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/loyalty/points</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Points fidélité - Récupérer les points de fidélité</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/loyalty/redeem" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/loyalty/redeem</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Utiliser points - Utiliser les points de fidélité</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/referrals" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/referrals</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Parrainages - Récupérer les parrainages</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/referrals/invite" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/referrals/invite</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Inviter - Inviter un ami via parrainage</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/insurance/plans" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/insurance/plans</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Plans assurance - Récupérer les plans d'assurance</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/earnings" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/earnings</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Revenus - Récupérer les revenus générés</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/earnings/stats" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/earnings/stats</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Stats revenus - Récupérer les statistiques de revenus</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/vehicles" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/vehicles</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Véhicules - Récupérer mes véhicules</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/vehicles" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/vehicles</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Ajouter véhicule - Ajouter un nouveau véhicule</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/surge" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/surge</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Surge - Récupérer les informations de surge</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/surge/zones" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/surge/zones</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Zones surge - Récupérer les zones avec surge</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/zones" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/zones</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Zones - Récupérer les zones disponibles</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/zones/active" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/zones/active</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Zones actives - Récupérer les zones actives</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/feedback" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/feedback</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Retours - Envoyer des retours sur l'application</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/lost-found" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/lost-found</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Objets perdus - Récupérer les objets perdus</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/lost-found" data-category="misc">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/lost-found</code>
+                            <span class="tech-badge tech-nodejs">Node.js</span>
+                        </div>
+                        <div class="endpoint-description">Signaler objet perdu - Signaler un objet perdu</div>
+                        <div class="service-label">Backend API</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Face AI API -->
+            <div class="service-group" data-service="face-ai">
+                <div class="service-group-title">
+                    🧠 Face AI API
+                    <span>http://localhost:8000</span>
+                </div>
+
+                <!-- Face Core Section -->
+                <div data-category="face-core">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🧠 Core Models (ML Local)
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/detect" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/detect</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Détection visage - Détection de visages avec dlib</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/recognize" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/recognize</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Reconnaissance faciale - Identification avec dlib + TensorFlow</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/compare" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/compare</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Comparer 2 visages - Comparaison de similarité faciale</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/gender" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/gender</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Détection genre - Détection du genre avec PyTorch + TF</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/antispoof" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/antispoof</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Anti-usurpation - Détection anti-usurpation d'identité</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/voice-gender" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/voice-gender</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Genre par voix - Détection du genre par analyse vocale</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/age" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/age</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Estimation âge - Estimation de l'âge avec Keras</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/count-faces" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/count-faces</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Comptage visages - Comptage des visages avec YOLO</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/detect-heads" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/detect-heads</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Détection têtes - Détection des têtes avec YOLO</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/analyze" data-category="face-core">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/analyze</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Analyse complète - Analyse complète d'une image</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                </div>
+
+                <!-- Face Safety Section -->
+                <div data-category="face-safety">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🛡️ Pipelines Sécurité
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/driver-verify" data-category="face-safety">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/driver-verify</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Vérification conductrice - Vérification complète d'une conductrice</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/passenger-verify" data-category="face-safety">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/passenger-verify</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Vérification passagère - Vérification complète d'une passagère</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/trip-safety" data-category="face-safety">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/trip-safety</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Sécurité trajet - Monitoring de sécurité pendant le trajet</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                </div>
+
+                <!-- AI Providers Section -->
+                <div data-category="face-ai">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        ☁️ IA Providers (Cloud)
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/gender" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/gender</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Genre via IA externe - Détection genre via Gemini/GPT/Claude</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/age" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/age</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Âge via IA externe - Estimation d'âge via IA cloud</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/analyze" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/analyze</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Analyse via IA externe - Analyse complète via IA cloud</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/describe" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/describe</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Description via IA - Description textuelle d'une image</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/verify" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/verify</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Vérification via IA - Vérification via IA cloud</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/emotion" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/emotion</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Émotion via IA - Détection d'émotion via IA cloud</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="POST" data-path="/api/ai/ethnicity" data-category="face-ai">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-POST">POST</span>
+                            <code class="endpoint-path">/api/ai/ethnicity</code>
+                            <span class="tech-badge tech-ia-cloud">IA Cloud</span>
+                        </div>
+                        <div class="endpoint-description">Ethnie via IA - Détection d'ethnie via IA cloud</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                </div>
+
+                <!-- Health Section -->
+                <div data-category="face-health">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        ❤️ Santé
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/health/ping" data-category="face-health">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/health/ping</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Ping - Vérifier la disponibilité du service (sans auth)</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/test" data-category="face-health">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/test</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Test - Tester les modèles ML (sans auth)</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                    <div class="endpoint" data-method="GET" data-path="/api/health" data-category="face-health">
+                        <div class="endpoint-header">
+                            <span class="method-badge method-GET">GET</span>
+                            <code class="endpoint-path">/api/health</code>
+                            <span class="tech-badge tech-ml-local">ML Local</span>
+                        </div>
+                        <div class="endpoint-description">Santé complète - Vérifier l'état complet du service</div>
+                        <div class="service-label">Face AI API</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- External Services -->
+            <div class="service-group" data-service="external">
+                <div class="service-group-title">
+                    🌐 Services Externes
+                </div>
+
+                <div data-category="external">
+                    <div class="service-group-title" style="font-size: 1.2rem; color: #e0e0e0; border: none; margin-top: 1.5rem; margin-bottom: 1rem;">
+                        🌐 Intégrations
+                    </div>
+                    <div class="endpoint visible" data-method="GET" data-path="http://localhost:8081" data-category="external">
+                        <div class="endpoint-header">
+                            <span class="method-badge" style="background-color: rgba(107, 114, 128, 0.3); color: #9ca3af;">MongoDB</span>
+                            <code class="endpoint-path">MongoDB UI</code>
+                            <span class="tech-badge tech-external">Externe</span>
+                        </div>
+                        <div class="endpoint-description">Interface MongoDB - Gestion de la base de données MongoDB</div>
+                        <div class="service-label">http://localhost:8081 | login: admin / sally2024</div>
+                    </div>
+                    <div class="endpoint visible" data-method="GET" data-path="http://localhost:8082" data-category="external">
+                        <div class="endpoint-header">
+                            <span class="method-badge" style="background-color: rgba(107, 114, 128, 0.3); color: #9ca3af;">Redis</span>
+                            <code class="endpoint-path">Redis UI</code>
+                            <span class="tech-badge tech-external">Externe</span>
+                        </div>
+                        <div class="endpoint-description">Interface Redis - Gestion du cache Redis</div>
+                        <div class="service-label">http://localhost:8082 | login: admin / sally2024</div>
+                    </div>
+                    <div class="endpoint visible" data-method="GET" data-path="http://localhost:5601" data-category="external">
+                        <div class="endpoint-header">
+                            <span class="method-badge" style="background-color: rgba(107, 114, 128, 0.3); color: #9ca3af;">Kibana</span>
+                            <code class="endpoint-path">Kibana</code>
+                            <span class="tech-badge tech-external">Externe</span>
+                        </div>
+                        <div class="endpoint-description">Dashboard Kibana - Visualisation des logs et analytics</div>
+                        <div class="service-label">http://localhost:5601</div>
+                    </div>
+                    <div class="endpoint visible" data-method="GET" data-path="http://localhost:9200" data-category="external">
+                        <div class="endpoint-header">
+                            <span class="method-badge" style="background-color: rgba(107, 114, 128, 0.3); color: #9ca3af;">Elastic</span>
+                            <code class="endpoint-path">Elasticsearch</code>
+                            <span class="tech-badge tech-external">Externe</span>
+                        </div>
+                        <div class="endpoint-description">Elasticsearch - Moteur de recherche et indexation</div>
+                        <div class="service-label">http://localhost:9200</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No Results Message -->
+            <div class="no-results" id="noResults" style="display: none;">
+                <div class="no-results-icon">🔍</div>
+                <h2>Aucun résultat trouvé</h2>
+                <p>Essayez une autre recherche ou sélectionnez une catégorie</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const categoryButtons = document.querySelectorAll('.category-btn');
+        const endpoints = document.querySelectorAll('.endpoint');
+        const noResultsDiv = document.getElementById('noResults');
+        let currentCategory = 'auth';
+
+        // Handle category selection
+        categoryButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                categoryButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCategory = btn.dataset.category;
+                filterEndpoints();
+            });
+        });
+
+        // Handle search
+        searchInput.addEventListener('input', filterEndpoints);
+
+        function filterEndpoints() {
+            const searchTerm = searchInput.value.toLowerCase();
+            let hasVisibleEndpoints = false;
+
+            endpoints.forEach(endpoint => {
+                const category = endpoint.dataset.category;
+                const method = endpoint.dataset.method;
+                const path = endpoint.dataset.path.toLowerCase();
+                const description = endpoint.textContent.toLowerCase();
+
+                let isInCategory = category === currentCategory;
+                let matchesSearch = !searchTerm || path.includes(searchTerm) || description.includes(searchTerm) || method.toLowerCase().includes(searchTerm);
+
+                if (isInCategory && matchesSearch) {
+                    endpoint.classList.add('visible');
+                    hasVisibleEndpoints = true;
+                } else {
+                    endpoint.classList.remove('visible');
+                }
+            });
+
+            noResultsDiv.style.display = hasVisibleEndpoints ? 'none' : 'block';
+        }
+
+        // Initial display
+        filterEndpoints();
+    </script>
+</body>
+</html>

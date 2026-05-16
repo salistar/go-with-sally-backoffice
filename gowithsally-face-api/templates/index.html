@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoWithSally AI - Face & Gender Verification</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e27;
+            --bg-secondary: #111c44;
+            --bg-tertiary: #1a2f5f;
+            --border: #2d3e7a;
+            --border-light: #3d5194;
+            --text-primary: #e8ecff;
+            --text-secondary: #b4bfff;
+            --text-tertiary: #7d8acc;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --radius: 12px;
+            --radius-lg: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, var(--bg-secondary) 50%, var(--bg) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-purple);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-pink);
+        }
+
+        /* Selection */
+        ::selection {
+            background: var(--accent-purple);
+            color: white;
+        }
+
+        /* ============================================================================
+           ANIMATIONS
+           ============================================================================ */
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(139, 92, 246, 0.6);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* ============================================================================
+           HEADER & NAVIGATION
+           ============================================================================ */
+
+        header {
+            background: rgba(10, 14, 39, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            padding: 1.5rem 2rem;
+        }
+
+        .navbar {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: slideInLeft 0.6s ease-out;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+        }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .brand-name {
+            font-size: 1.3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .brand-subtitle {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            animation: slideInRight 0.6s ease-out;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-purple);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent-purple);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.5);
+        }
+
+        /* ============================================================================
+           HERO SECTION
+           ============================================================================ */
+
+        .hero {
+            margin-top: 80px;
+            padding: 4rem 2rem;
+            min-height: calc(100vh - 80px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            max-width: 1000px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .hero-subtitle {
+            color: var(--accent-purple);
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 50px;
+            border: 1px solid var(--border-light);
+        }
+
+        .hero-title {
+            font-size: 4rem;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-description {
+            font-size: 1.3rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 4rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            color: white;
+            padding: 1rem 2.5rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(139, 92, 246, 0.6);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            padding: 1rem 2.5rem;
+            border: 2px solid var(--border-light);
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: var(--accent-purple);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 50px;
+            color: var(--success);
+            font-weight: 600;
+            font-size: 0.95rem;
+            animation: slideInUp 0.6s ease-out 0.3s backwards;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        /* ============================================================================
+           FEATURES SECTION
+           ============================================================================ */
+
+        .features {
+            padding: 5rem 2rem;
+            background: linear-gradient(180deg, transparent 0%, rgba(139, 92, 246, 0.05) 50%, transparent 100%);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .section-label {
+            color: var(--accent-purple);
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-title {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .section-description {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(26, 47, 95, 0.4);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.8s ease-out backwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:nth-child(1) { animation-delay: 0.1s; }
+        .feature-card:nth-child(2) { animation-delay: 0.2s; }
+        .feature-card:nth-child(3) { animation-delay: 0.3s; }
+        .feature-card:nth-child(4) { animation-delay: 0.4s; }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-light);
+            transform: translateY(-8px);
+            background: rgba(26, 47, 95, 0.6);
+            box-shadow: 0 12px 32px rgba(139, 92, 246, 0.2);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 8px 16px rgba(139, 92, 246, 0.3);
+        }
+
+        .feature-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ============================================================================
+           API DOCUMENTATION SECTION
+           ============================================================================ */
+
+        .api-docs {
+            padding: 5rem 2rem;
+            background: rgba(26, 47, 95, 0.2);
+        }
+
+        .api-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .endpoints-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .endpoint-card {
+            background: rgba(10, 14, 39, 0.8);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+
+        .endpoint-card:nth-child(1) { animation-delay: 0.1s; }
+        .endpoint-card:nth-child(2) { animation-delay: 0.2s; }
+        .endpoint-card:nth-child(3) { animation-delay: 0.3s; }
+        .endpoint-card:nth-child(4) { animation-delay: 0.4s; }
+        .endpoint-card:nth-child(5) { animation-delay: 0.5s; }
+        .endpoint-card:nth-child(6) { animation-delay: 0.6s; }
+
+        .endpoint-card:hover {
+            border-color: var(--accent-purple);
+            background: rgba(26, 47, 95, 0.4);
+            transform: translateY(-4px);
+        }
+
+        .endpoint-method {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.75rem;
+        }
+
+        .endpoint-method.post {
+            background: rgba(236, 72, 153, 0.2);
+            color: var(--accent-pink);
+            border: 1px solid var(--accent-pink);
+        }
+
+        .endpoint-method.get {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .endpoint-path {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            word-break: break-all;
+        }
+
+        .endpoint-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* ============================================================================
+           TECH STACK SECTION
+           ============================================================================ */
+
+        .tech-stack {
+            padding: 5rem 2rem;
+            background: linear-gradient(180deg, transparent 0%, rgba(236, 72, 153, 0.05) 50%, transparent 100%);
+        }
+
+        .tech-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .badges-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tech-badge {
+            background: rgba(26, 47, 95, 0.4);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+
+        .tech-badge:nth-child(1) { animation-delay: 0.1s; }
+        .tech-badge:nth-child(2) { animation-delay: 0.2s; }
+        .tech-badge:nth-child(3) { animation-delay: 0.3s; }
+        .tech-badge:nth-child(4) { animation-delay: 0.4s; }
+        .tech-badge:nth-child(5) { animation-delay: 0.5s; }
+        .tech-badge:nth-child(6) { animation-delay: 0.6s; }
+
+        .tech-badge:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(139, 92, 246, 0.2);
+            background: rgba(26, 47, 95, 0.6);
+        }
+
+        .tech-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tech-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-version {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ============================================================================
+           CTA SECTION
+           ============================================================================ */
+
+        .cta-section {
+            padding: 4rem 2rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .cta-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .cta-description {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ============================================================================
+           FOOTER
+           ============================================================================ */
+
+        footer {
+            background: rgba(10, 14, 39, 0.5);
+            border-top: 1px solid var(--border);
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 0.9rem;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--accent-purple);
+        }
+
+        .footer-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+
+        /* ============================================================================
+           RESPONSIVE DESIGN
+           ============================================================================ */
+
+        @media (max-width: 768px) {
+            header {
+                padding: 1rem;
+            }
+
+            .navbar {
+                padding: 0;
+            }
+
+            .nav-links {
+                gap: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .hero {
+                margin-top: 70px;
+                padding: 2rem 1rem;
+                min-height: auto;
+            }
+
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .hero-description {
+                font-size: 1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn-primary, .btn-secondary {
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-title {
+                font-size: 1.8rem;
+            }
+
+            .brand-text {
+                display: none;
+            }
+
+            .footer-links {
+                gap: 1rem;
+            }
+
+            .footer-divider {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: 1.8rem;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+
+            .cta-title {
+                font-size: 1.3rem;
+            }
+
+            .nav-link {
+                display: none;
+            }
+
+            .features-grid {
+                gap: 1rem;
+            }
+
+            .feature-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="navbar">
+            <div class="brand">
+                <div class="brand-icon">🧬</div>
+                <div class="brand-text">
+                    <div class="brand-name">GoWithSally AI</div>
+                    <div class="brand-subtitle">Face Verification</div>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#api-docs" class="nav-link">API</a>
+                <a href="#tech-stack" class="nav-link">Tech Stack</a>
+                <a href="/api/test" class="nav-link">Status</a>
+                <a href="/login" class="cta-button" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);padding:10px 24px;border-radius:10px;color:white;font-weight:600;text-decoration:none"><i class="fas fa-sign-in-alt"></i> Connexion</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" style="display:flex;align-items:center;justify-content:center;text-align:center">
+        <div class="hero-content" style="display:flex;flex-direction:column;align-items:center;max-width:700px">
+            <div class="hero-subtitle">Plateforme IA de Vérification</div>
+            <h1 class="hero-title">GoWithSally AI Studio</h1>
+            <p class="hero-description" style="text-align:center">
+                13 modèles ML locaux : détection faciale, reconnaissance, genre, âge, anti-usurpation, comptage YOLO, voix.
+                Plus 7 fournisseurs IA Cloud en fallback.
+            </p>
+            <div style="margin-top:40px">
+                <a href="/login" style="padding:16px 48px;background:linear-gradient(135deg,#8b5cf6,#ec4899);border:none;border-radius:14px;color:white;font-size:17px;font-weight:700;font-family:Poppins;cursor:pointer;text-decoration:none;transition:all 0.3s;display:inline-flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(139,92,246,0.4)"><i class="fas fa-flask"></i> Accéder au Studio</a>
+            </div>
+            <div class="status-indicator" style="margin-top:24px">
+                <span class="status-dot"></span>
+                <span id="statusText">Vérification du serveur...</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="section-header">
+            <div class="section-label">Capabilities</div>
+            <h2 class="section-title">Powerful Features</h2>
+            <p class="section-description">
+                Comprehensive face analysis and verification suite with state-of-the-art AI models
+            </p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">👁️</div>
+                <h3 class="feature-title">Face Detection</h3>
+                <p class="feature-description">
+                    Advanced face detection using YOLO v8 with multi-face detection capabilities
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚧️</div>
+                <h3 class="feature-title">Gender Verification</h3>
+                <p class="feature-description">
+                    High-accuracy gender classification using TensorFlow and PyTorch models
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎵</div>
+                <h3 class="feature-title">Voice Analysis</h3>
+                <p class="feature-description">
+                    Gender detection from audio using advanced voice feature extraction
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Real-time Processing</h3>
+                <p class="feature-description">
+                    Sub-second latency with optimized inference and GPU acceleration
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3 class="feature-title">Anti-Spoof Detection</h3>
+                <p class="feature-description">
+                    Liveness detection to prevent spoofing attacks and face replacement
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🧮</div>
+                <h3 class="feature-title">Age Estimation</h3>
+                <p class="feature-description">
+                    Accurate age prediction using deep neural networks
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3 class="feature-title">Face Recognition</h3>
+                <p class="feature-description">
+                    Face embedding extraction with recognition and comparison capabilities
+                </p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Landmark Detection</h3>
+                <p class="feature-description">
+                    68-point facial landmark detection for precise face analysis
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Documentation -->
+    <section id="api-docs" class="api-docs">
+        <div class="api-container">
+            <div class="section-header">
+                <div class="section-label">Integration</div>
+                <h2 class="section-title">API Endpoints</h2>
+                <p class="section-description">
+                    RESTful API with comprehensive face analysis and verification capabilities
+                </p>
+            </div>
+
+            <div class="endpoints-grid">
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/detect</div>
+                    <p class="endpoint-description">Detect faces in an image</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/recognize</div>
+                    <p class="endpoint-description">Extract face embeddings</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/gender</div>
+                    <p class="endpoint-description">Classify face gender</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/compare</div>
+                    <p class="endpoint-description">Compare two face embeddings</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/antispoof</div>
+                    <p class="endpoint-description">Detect spoofing attempts</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method get">GET</span>
+                    <div class="endpoint-path">/api/health</div>
+                    <p class="endpoint-description">Service health status</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/voice-gender</div>
+                    <p class="endpoint-description">Detect gender from voice</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/age</div>
+                    <p class="endpoint-description">Estimate face age</p>
+                </div>
+
+                <div class="endpoint-card">
+                    <span class="endpoint-method post">POST</span>
+                    <div class="endpoint-path">/api/analyze</div>
+                    <p class="endpoint-description">Comprehensive face analysis</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack -->
+    <section id="tech-stack" class="tech-stack">
+        <div class="tech-container">
+            <div class="section-header">
+                <div class="section-label">Built With</div>
+                <h2 class="section-title">Technology Stack</h2>
+                <p class="section-description">
+                    Leveraging cutting-edge machine learning frameworks and libraries
+                </p>
+            </div>
+
+            <div class="badges-grid">
+                <div class="tech-badge">
+                    <div class="tech-icon">🐍</div>
+                    <div class="tech-name">Python</div>
+                    <div class="tech-version">3.10+</div>
+                </div>
+
+                <div class="tech-badge">
+                    <div class="tech-icon">⚡</div>
+                    <div class="tech-name">FastAPI</div>
+                    <div class="tech-version">0.100+</div>
+                </div>
+
+                <div class="tech-badge">
+                    <div class="tech-icon">🧠</div>
+                    <div class="tech-name">TensorFlow</div>
+                    <div class="tech-version">2.13+</div>
+                </div>
+
+                <div class="tech-badge">
+                    <div class="tech-icon">🔥</div>
+                    <div class="tech-name">PyTorch</div>
+                    <div class="tech-version">2.0+</div>
+                </div>
+
+                <div class="tech-badge">
+                    <div class="tech-icon">📷</div>
+                    <div class="tech-name">OpenCV</div>
+                    <div class="tech-version">4.8+</div>
+                </div>
+
+                <div class="tech-badge">
+                    <div class="tech-icon">🦁</div>
+                    <div class="tech-name">Dlib</div>
+                    <div class="tech-version">19.24+</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2 class="cta-title">Ready to Integrate?</h2>
+        <p class="cta-description">
+            Get started with our comprehensive API documentation and example implementations
+        </p>
+        <button class="btn-primary">Start Integration →</button>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="#" class="footer-link">Documentation</a>
+                <div class="footer-divider"></div>
+                <a href="#" class="footer-link">API Reference</a>
+                <div class="footer-divider"></div>
+                <a href="#" class="footer-link">GitHub</a>
+                <div class="footer-divider"></div>
+                <a href="#" class="footer-link">Support</a>
+            </div>
+            <p>&copy; 2024 GoWithSally AI. All rights reserved. | Advanced Face Verification System</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll behavior for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // If already logged in, show studio link
+        const existingKey = sessionStorage.getItem('face_api_key');
+        if (existingKey) {
+            fetch('/api/health', { headers: { 'X-API-Key': existingKey } })
+                .then(r => { if (r.ok) window.location.href = '/studio'; })
+                .catch(() => {});
+        }
+
+        // Health check (no auth needed)
+        async function checkHealth() {
+            try {
+                const response = await fetch('/api/health/ping');
+                if (response.ok) {
+                    const statusEl = document.querySelector('.status-indicator');
+                    if (statusEl) { statusEl.style.color = '#10b981'; statusEl.textContent = 'En ligne'; }
+                }
+            } catch (error) {
+                console.error('Health check failed:', error);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(checkHealth, 500);
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animation = 'fadeInUp 0.8s ease-out forwards';
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .endpoint-card, .tech-badge').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

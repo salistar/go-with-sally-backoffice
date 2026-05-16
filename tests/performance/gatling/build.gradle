@@ -1,0 +1,67 @@
+plugins {
+    id 'java'
+    id 'scala'
+    id 'io.gatling.gradle' version '3.9.5'
+}
+
+group = 'com.gowithsally'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    // Gatling core
+    gatlingImplementation 'io.gatling:gatling-app:3.9.5'
+    gatlingImplementation 'io.gatling:gatling-recorder:3.9.5'
+    gatlingImplementation 'io.gatling.highcharts:gatling-charts-highcharts:3.9.5'
+
+    // Gatling extensions
+    gatlingImplementation 'io.gatling:gatling-http:3.9.5'
+    gatlingImplementation 'io.gatling:gatling-websocket:3.9.5'
+    gatlingImplementation 'io.gatling:gatling-sse:3.9.5'
+
+    // Scala
+    gatlingImplementation 'org.scala-lang:scala-library:2.13.12'
+
+    // JSON handling
+    gatlingImplementation 'org.json:json:20231013'
+    gatlingImplementation 'com.google.code.gson:gson:2.10.1'
+
+    // Logging
+    gatlingImplementation 'org.slf4j:slf4j-api:2.0.9'
+    gatlingImplementation 'ch.qos.logback:logback-classic:1.4.11'
+    gatlingImplementation 'ch.qos.logback:logback-core:1.4.11'
+
+    // Utilities
+    gatlingImplementation 'commons-io:commons-io:2.14.0'
+    gatlingImplementation 'commons-lang:commons-lang:2.6'
+    gatlingImplementation 'com.typesafe:config:1.4.2'
+}
+
+gatling {
+    simulations {
+        include '**/*Simulation.scala'
+    }
+
+    jvmArgs = [
+        '-server',
+        '-Xmx1G',
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=30',
+        '-XX:InitiatingHeapOccupancyPercent=35',
+        '-XX:+DisableExplicitGC',
+        '-XX:-OmitStackTraceInFastThrow',
+        '-XX:NewRatio=1',
+        '-Djava.net.preferIPv4Stack=true',
+        '-Djava.net.preferIPv6Addresses=false',
+        '-Dio.netty.noUnsafe=true',
+        '-Dio.netty.recycler.maxCapacityPerThread=0'
+    ]
+}
+
+tasks.withType(ScalaCompile) {
+    scalaCompileOptions.additionalParameters = ['-target:jvm-1.8']
+}

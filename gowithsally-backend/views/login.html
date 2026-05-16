@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoWithSally - Connexion</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6.5 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --rose-gold: #B76E79;
+      --deep-pink: #FF1493;
+      --champagne: #F7E7CE;
+      --soft-gold: #D4AF37;
+      --dark-purple: #1a0f2e;
+      --dark-navy: #2d1b4e;
+      --text-light: #f0f0f0;
+      --text-muted: rgba(240, 240, 240, 0.7);
+      --text-subtle: rgba(240, 240, 240, 0.4);
+      --gradient-primary: linear-gradient(135deg, #B76E79 0%, #FF1493 100%);
+      --gradient-bg: linear-gradient(135deg, #1a0f2e 0%, #2d1b4e 50%, #1f1242 100%);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--gradient-bg);
+      background-attachment: fixed;
+      color: var(--text-light);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Animated background gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        45deg,
+        rgba(183, 110, 121, 0.08) 0%,
+        rgba(255, 20, 147, 0.05) 25%,
+        rgba(212, 175, 55, 0.03) 50%,
+        rgba(247, 231, 206, 0.02) 75%,
+        rgba(183, 110, 121, 0.08) 100%
+      );
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes gradientShift {
+      0%, 100% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+    }
+
+    /* Language Switcher */
+    .lang-switcher {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    html[dir="rtl"] .lang-switcher {
+      right: auto;
+      left: 24px;
+    }
+
+    .lang-btn {
+      padding: 8px 14px;
+      border: 1px solid rgba(183, 110, 121, 0.3);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .lang-btn:hover {
+      border-color: var(--soft-gold);
+      color: var(--soft-gold);
+    }
+
+    .lang-btn.active {
+      background: rgba(183, 110, 121, 0.25);
+      border-color: var(--rose-gold);
+      color: var(--champagne);
+      box-shadow: 0 0 20px rgba(183, 110, 121, 0.3);
+    }
+
+    /* Main Container */
+    .login-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* Glass Morphism Card */
+    .login-card {
+      background: rgba(47, 27, 78, 0.4);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(183, 110, 121, 0.2);
+      border-radius: 24px;
+      padding: 48px 40px;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle shine effect */
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(
+        45deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.05) 50%,
+        transparent 100%
+      );
+      animation: shimmer 8s infinite;
+      pointer-events: none;
+    }
+
+    @keyframes shimmer {
+      0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+      }
+      100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+      }
+    }
+
+    /* Logo Section */
+    .logo-section {
+      text-align: center;
+      margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-icon {
+      width: 90px;
+      height: 90px;
+      background: var(--gradient-primary);
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      color: white;
+      margin-bottom: 20px;
+      box-shadow: 0 12px 40px rgba(183, 110, 121, 0.35);
+      animation: floatIcon 3s ease-in-out infinite;
+    }
+
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .logo-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-subtitle {
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+
+    /* Tab Navigation */
+    .tab-navigation {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 6px;
+      margin-bottom: 32px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 11px;
+      transition: all 0.3s ease;
+      position: relative;
+      z-index: 2;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-light);
+    }
+
+    .tab-btn.active {
+      background: var(--gradient-primary);
+      color: white;
+      box-shadow: 0 6px 20px rgba(183, 110, 121, 0.3);
+    }
+
+    /* Message Alerts */
+    .alert {
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+      animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .alert-error {
+      background: rgba(244, 67, 54, 0.15);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #ff6b6b;
+    }
+
+    .alert-success {
+      background: rgba(76, 175, 80, 0.15);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      color: #81c784;
+    }
+
+    /* Form Group */
+    .form-group {
+      margin-bottom: 22px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .form-label {
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .form-input-icon {
+      position: absolute;
+      left: 16px;
+      color: var(--text-subtle);
+      font-size: 16px;
+      pointer-events: none;
+    }
+
+    html[dir="rtl"] .form-input-icon {
+      left: auto;
+      right: 16px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px 16px 14px 48px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(183, 110, 121, 0.15);
+      border-radius: 12px;
+      color: var(--text-light);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    html[dir="rtl"] .form-input {
+      padding: 14px 48px 14px 16px;
+    }
+
+    .form-input::placeholder {
+      color: var(--text-subtle);
+    }
+
+    .form-input:focus {
+      border-color: var(--rose-gold);
+      background: rgba(183, 110, 121, 0.08);
+      box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.1);
+    }
+
+    .toggle-password-btn {
+      position: absolute;
+      right: 14px;
+      background: none;
+      border: none;
+      color: var(--text-subtle);
+      cursor: pointer;
+      font-size: 16px;
+      transition: color 0.3s ease;
+      padding: 4px;
+    }
+
+    html[dir="rtl"] .toggle-password-btn {
+      right: auto;
+      left: 14px;
+    }
+
+    .toggle-password-btn:hover {
+      color: var(--rose-gold);
+    }
+
+    /* Phone Input Group */
+    .phone-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .phone-prefix {
+      width: 90px;
+      padding: 14px 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(183, 110, 121, 0.15);
+      border-radius: 12px;
+      color: var(--text-light);
+      font-size: 14px;
+      text-align: center;
+      user-select: none;
+    }
+
+    .phone-number {
+      flex: 1;
+    }
+
+    /* Remember & Forgot */
+    .form-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .remember-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .remember-checkbox input[type="checkbox"] {
+      accent-color: var(--rose-gold);
+      cursor: pointer;
+    }
+
+    .forgot-password-link {
+      color: var(--soft-gold);
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.3s ease;
+    }
+
+    .forgot-password-link:hover {
+      color: var(--champagne);
+      text-decoration: underline;
+    }
+
+    /* Button */
+    .btn-primary {
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--gradient-primary);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 25px rgba(183, 110, 121, 0.3);
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 35px rgba(183, 110, 121, 0.4);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-spinner {
+      display: none;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .btn-text {
+      display: inline;
+    }
+
+    .btn-primary.loading .btn-spinner {
+      display: inline;
+    }
+
+    .btn-primary.loading .btn-text {
+      display: none;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 28px 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(183, 110, 121, 0.15);
+    }
+
+    .divider-text {
+      color: var(--text-muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    /* Social Login */
+    .social-login {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .social-btn {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid rgba(183, 110, 121, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      color: var(--text-light);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .social-btn:hover {
+      background: rgba(183, 110, 121, 0.1);
+      border-color: var(--rose-gold);
+      transform: translateY(-2px);
+    }
+
+    /* Test Credentials Section */
+    .test-credentials {
+      margin-top: 32px;
+      border-top: 1px solid rgba(183, 110, 121, 0.15);
+      padding-top: 28px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .test-creds-header {
+      background: rgba(183, 110, 121, 0.08);
+      border: 1px solid rgba(183, 110, 121, 0.15);
+      border-radius: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.3s ease;
+    }
+
+    .test-creds-header:hover {
+      background: rgba(183, 110, 121, 0.12);
+      border-color: var(--rose-gold);
+    }
+
+    .test-creds-title {
+      color: var(--soft-gold);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .test-creds-toggle {
+      color: var(--text-muted);
+      transition: transform 0.3s ease;
+    }
+
+    .test-creds-header.expanded .test-creds-toggle {
+      transform: rotate(180deg);
+    }
+
+    .test-creds-content {
+      display: none;
+      margin-top: 16px;
+      max-height: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .test-creds-content.expanded {
+      display: block;
+      max-height: 1200px;
+    }
+
+    /* Credentials Groups */
+    .credentials-groups {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .cred-group {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(183, 110, 121, 0.1);
+      border-radius: 12px;
+      padding: 14px;
+      overflow: hidden;
+    }
+
+    .cred-group-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: var(--champagne);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cred-group-icon {
+      font-size: 14px;
+    }
+
+    .cred-items {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .cred-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(183, 110, 121, 0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .cred-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(183, 110, 121, 0.15);
+    }
+
+    .cred-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .cred-item-email {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .cred-item-password {
+      color: var(--text-subtle);
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .cred-item-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .copy-pwd-btn {
+      background: rgba(183, 110, 121, 0.2);
+      border: 1px solid rgba(183, 110, 121, 0.3);
+      color: var(--soft-gold);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .copy-pwd-btn:hover {
+      background: rgba(183, 110, 121, 0.3);
+      border-color: var(--soft-gold);
+    }
+
+    .copy-pwd-btn.copied {
+      background: rgba(76, 175, 80, 0.3);
+      border-color: rgba(76, 175, 80, 0.5);
+      color: #81c784;
+    }
+
+    .quick-login-btn {
+      background: var(--gradient-primary);
+      border: none;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .quick-login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(183, 110, 121, 0.3);
+    }
+
+    .quick-login-btn:active {
+      transform: translateY(0);
+    }
+
+    .creds-note {
+      background: rgba(76, 175, 80, 0.1);
+      border: 1px solid rgba(76, 175, 80, 0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .creds-note i {
+      color: rgba(76, 175, 80, 0.6);
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 28px;
+      color: var(--text-subtle);
+      font-size: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .footer a {
+      color: var(--soft-gold);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .footer a:hover {
+      color: var(--champagne);
+      text-decoration: underline;
+    }
+
+    /* Form Sections */
+    .form-section {
+      display: none;
+      position: relative;
+      z-index: 1;
+    }
+
+    .form-section.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 32px 24px;
+      }
+
+      .logo-title {
+        font-size: 28px;
+      }
+
+      .logo-icon {
+        width: 80px;
+        height: 80px;
+        font-size: 38px;
+      }
+
+      .form-footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .social-login {
+        gap: 8px;
+      }
+
+      .credentials-table {
+        font-size: 11px;
+      }
+
+      .credentials-table td,
+      .credentials-table th {
+        padding: 8px 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Language Switcher -->
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="setLanguage('fr')">FR</button>
+    <button class="lang-btn" onclick="setLanguage('ar')">AR</button>
+    <button class="lang-btn" onclick="setLanguage('en')">EN</button>
+  </div>
+
+  <!-- Main Container -->
+  <div class="login-wrapper">
+    <div class="login-container">
+      <div class="login-card">
+        <!-- Logo Section -->
+        <div class="logo-section">
+          <div class="logo-icon">
+            <i class="fas fa-car-side"></i>
+          </div>
+          <h1 class="logo-title" data-i18n="appName">GoWithSally</h1>
+          <p class="logo-subtitle" data-i18n="appSubtitle">Transport pour femmes en toute sécurité</p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+          <button class="tab-btn active" onclick="switchTab('login')" data-i18n="tabLogin">Connexion</button>
+          <button class="tab-btn" onclick="switchTab('register')" data-i18n="tabRegister">Inscription</button>
+        </div>
+
+        <!-- Alerts -->
+        <div class="alert alert-error" id="errorAlert">
+          <i class="fas fa-exclamation-circle"></i>
+          <span id="errorText"></span>
+        </div>
+        <div class="alert alert-success" id="successAlert">
+          <i class="fas fa-check-circle"></i>
+          <span id="successText"></span>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="loginForm" class="form-section active" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblEmailPhone">Email ou Téléphone</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-envelope form-input-icon"></i>
+              <input type="text" id="loginIdentifier" class="form-input" placeholder="email@exemple.com" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblPassword">Mot de passe</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-lock form-input-icon"></i>
+              <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
+              <button type="button" class="toggle-password-btn" onclick="togglePassword('loginPassword')">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <label class="remember-checkbox">
+              <input type="checkbox" id="rememberMe">
+              <span data-i18n="lblRemember">Se souvenir</span>
+            </label>
+            <a href="#" class="forgot-password-link" data-i18n="lblForgot">Mot de passe oublié?</a>
+          </div>
+
+          <button type="submit" class="btn-primary" id="loginBtn">
+            <span class="btn-spinner"><i class="fas fa-spinner"></i></span>
+            <span class="btn-text" data-i18n="btnLogin">Se connecter</span>
+          </button>
+        </form>
+
+        <!-- REGISTER FORM -->
+        <form id="registerForm" class="form-section" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblFirstName">Prénom</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-user form-input-icon"></i>
+              <input type="text" id="regFirstName" class="form-input" placeholder="Votre prénom" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblLastName">Nom</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-user form-input-icon"></i>
+              <input type="text" id="regLastName" class="form-input" placeholder="Votre nom" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblEmail">Email</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-envelope form-input-icon"></i>
+              <input type="email" id="regEmail" class="form-input" placeholder="email@exemple.com" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblPhone">Téléphone</label>
+            <div class="phone-group">
+              <div class="phone-prefix">+212</div>
+              <div class="form-input-wrapper phone-number">
+                <i class="fas fa-phone form-input-icon"></i>
+                <input type="tel" id="regPhone" class="form-input" placeholder="6XXXXXXXX" pattern="[67][0-9]{8}" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="lblPassword">Mot de passe</label>
+            <div class="form-input-wrapper">
+              <i class="fas fa-lock form-input-icon"></i>
+              <input type="password" id="regPassword" class="form-input" placeholder="Min. 8 caractères" minlength="8" required>
+              <button type="button" class="toggle-password-btn" onclick="togglePassword('regPassword')">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" id="registerBtn">
+            <span class="btn-spinner"><i class="fas fa-spinner"></i></span>
+            <span class="btn-text" data-i18n="btnRegister">Créer un compte</span>
+          </button>
+        </form>
+
+        <!-- Divider -->
+        <div class="divider">
+          <span class="divider-text" data-i18n="dividerOr">ou</span>
+        </div>
+
+        <!-- Social Login -->
+        <div class="social-login">
+          <button class="social-btn" title="Google" onclick="socialLogin('google')">
+            <i class="fab fa-google"></i>
+          </button>
+          <button class="social-btn" title="Apple" onclick="socialLogin('apple')">
+            <i class="fab fa-apple"></i>
+          </button>
+          <button class="social-btn" title="Facebook" onclick="socialLogin('facebook')">
+            <i class="fab fa-facebook-f"></i>
+          </button>
+        </div>
+
+        <!-- Test Credentials -->
+        <div class="test-credentials">
+          <div class="test-creds-header" onclick="toggleTestCredentials(event)">
+            <div class="test-creds-title">
+              <i class="fas fa-flask-vial"></i>
+              <span data-i18n="testCredsTitle">Comptes de Test</span>
+            </div>
+            <i class="fas fa-chevron-down test-creds-toggle"></i>
+          </div>
+
+          <div class="test-creds-content" id="testCredsContent">
+            <div class="credentials-groups">
+              <!-- Admin Panel Group -->
+              <div class="cred-group">
+                <div class="cred-group-title">
+                  <i class="fas fa-shield-alt cred-group-icon"></i>
+                  <span data-i18n="adminPanelTitle">Panneau Admin (localhost:5000/admin)</span>
+                </div>
+                <div class="cred-items">
+                  <!-- Admin Account -->
+                  <div class="cred-item">
+                    <div class="cred-item-info">
+                      <div class="cred-item-email">admin@gowithsally.ma</div>
+                      <div class="cred-item-password">Admin@2024</div>
+                    </div>
+                    <div class="cred-item-actions">
+                      <button type="button" class="copy-pwd-btn" onclick="copyPassword('Admin@2024')" data-i18n="btnCopyPwd">Copier</button>
+                      <button type="button" class="quick-login-btn" onclick="quickLogin('admin@gowithsally.ma', 'Admin@2024')" title="Auto-fill and login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span data-i18n="btnQuickLogin">Connexion</span>
+                      </button>
+                    </div>
+                  </div>
+                  <!-- Support Account -->
+                  <div class="cred-item">
+                    <div class="cred-item-info">
+                      <div class="cred-item-email">support@gowithsally.ma</div>
+                      <div class="cred-item-password">Support@2024</div>
+                    </div>
+                    <div class="cred-item-actions">
+                      <button type="button" class="copy-pwd-btn" onclick="copyPassword('Support@2024')" data-i18n="btnCopyPwd">Copier</button>
+                      <button type="button" class="quick-login-btn" onclick="quickLogin('support@gowithsally.ma', 'Support@2024')" title="Auto-fill and login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span data-i18n="btnQuickLogin">Connexion</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- App - Drivers Group -->
+              <div class="cred-group">
+                <div class="cred-group-title">
+                  <i class="fas fa-car cred-group-icon"></i>
+                  <span data-i18n="driverAppTitle">App Conductrices (localhost:3000)</span>
+                </div>
+                <div class="cred-items">
+                  <div class="cred-item">
+                    <div class="cred-item-info">
+                      <div class="cred-item-email">fatima.driver@gmail.com</div>
+                      <div class="cred-item-password">Driver@2024</div>
+                    </div>
+                    <div class="cred-item-actions">
+                      <button type="button" class="copy-pwd-btn" onclick="copyPassword('Driver@2024')" data-i18n="btnCopyPwd">Copier</button>
+                      <button type="button" class="quick-login-btn" onclick="quickLogin('fatima.driver@gmail.com', 'Driver@2024')" title="Auto-fill and login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span data-i18n="btnQuickLogin">Connexion</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- App - Users Group -->
+              <div class="cred-group">
+                <div class="cred-group-title">
+                  <i class="fas fa-user-circle cred-group-icon"></i>
+                  <span data-i18n="userAppTitle">App Utilisatrices (localhost:3000)</span>
+                </div>
+                <div class="cred-items">
+                  <div class="cred-item">
+                    <div class="cred-item-info">
+                      <div class="cred-item-email">sara.user@gmail.com</div>
+                      <div class="cred-item-password">User@2024</div>
+                    </div>
+                    <div class="cred-item-actions">
+                      <button type="button" class="copy-pwd-btn" onclick="copyPassword('User@2024')" data-i18n="btnCopyPwd">Copier</button>
+                      <button type="button" class="quick-login-btn" onclick="quickLogin('sara.user@gmail.com', 'User@2024')" title="Auto-fill and login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span data-i18n="btnQuickLogin">Connexion</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="creds-note">
+              <i class="fas fa-info-circle"></i>
+              <span data-i18n="credsNote">Ces comptes de test sont destinés au développement et aux tests uniquement.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <p>&copy; 2024-2026 GoWithSally. <a href="#" data-i18n="linkTerms">Conditions</a> | <a href="#" data-i18n="linkPrivacy">Confidentialité</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // i18n Dictionary
+    const translations = {
+      fr: {
+        appName: 'GoWithSally',
+        appSubtitle: 'Transport pour femmes en toute sécurité',
+        tabLogin: 'Connexion',
+        tabRegister: 'Inscription',
+        lblEmailPhone: 'Email ou Téléphone',
+        lblPassword: 'Mot de passe',
+        lblFirstName: 'Prénom',
+        lblLastName: 'Nom',
+        lblEmail: 'Email',
+        lblPhone: 'Téléphone',
+        lblRemember: 'Se souvenir',
+        lblForgot: 'Mot de passe oublié?',
+        btnLogin: 'Se connecter',
+        btnRegister: 'Créer un compte',
+        dividerOr: 'ou',
+        testCredsTitle: 'Comptes de Test',
+        adminPanelTitle: 'Panneau Admin (localhost:5000/admin)',
+        driverAppTitle: 'App Conductrices (localhost:3000)',
+        userAppTitle: 'App Utilisatrices (localhost:3000)',
+        colRole: 'Rôle',
+        colEmail: 'Email',
+        colPassword: 'Mot de passe',
+        roleAdmin: 'Admin',
+        roleSupport: 'Support',
+        roleDriver: 'Conductrices',
+        roleUser: 'Utilisatrices',
+        btnCopy: 'Copier',
+        btnCopyPwd: 'Copier',
+        btnQuickLogin: 'Connexion',
+        credsNote: 'Ces comptes de test sont destinés au développement et aux tests uniquement.',
+        linkTerms: 'Conditions',
+        linkPrivacy: 'Confidentialité',
+        errorLogin: 'Identifiants invalides',
+        errorServer: 'Erreur de connexion au serveur',
+        errorRegister: 'Erreur lors de l\'inscription',
+        successLogin: 'Connexion réussie! Redirection...',
+        successRegister: 'Compte créé! Vérifiez votre téléphone.',
+        copied: 'Copié!'
+      },
+      ar: {
+        appName: 'GoWithSally',
+        appSubtitle: 'النقل الآمن للنساء',
+        tabLogin: 'تسجيل الدخول',
+        tabRegister: 'إنشاء حساب',
+        lblEmailPhone: 'البريد الإلكتروني أو الهاتف',
+        lblPassword: 'كلمة المرور',
+        lblFirstName: 'الاسم الأول',
+        lblLastName: 'اسم العائلة',
+        lblEmail: 'البريد الإلكتروني',
+        lblPhone: 'رقم الهاتف',
+        lblRemember: 'تذكرني',
+        lblForgot: 'هل نسيت كلمة المرور؟',
+        btnLogin: 'دخول',
+        btnRegister: 'إنشاء حساب',
+        dividerOr: 'أو',
+        testCredsTitle: 'حسابات الاختبار',
+        adminPanelTitle: 'لوحة المسؤول (localhost:5000/admin)',
+        driverAppTitle: 'تطبيق السائقات (localhost:3000)',
+        userAppTitle: 'تطبيق المستخدمات (localhost:3000)',
+        colRole: 'الدور',
+        colEmail: 'البريد الإلكتروني',
+        colPassword: 'كلمة المرور',
+        roleAdmin: 'مسؤول',
+        roleSupport: 'الدعم',
+        roleDriver: 'السائقات',
+        roleUser: 'المستخدمات',
+        btnCopy: 'نسخ',
+        btnCopyPwd: 'نسخ',
+        btnQuickLogin: 'دخول',
+        credsNote: 'هذه الحسابات الاختبارية مخصصة للتطوير والاختبار فقط.',
+        linkTerms: 'الشروط',
+        linkPrivacy: 'الخصوصية',
+        errorLogin: 'بيانات الدخول غير صحيحة',
+        errorServer: 'خطأ في الاتصال بالخادم',
+        errorRegister: 'خطأ في إنشاء الحساب',
+        successLogin: 'تم تسجيل الدخول بنجاح! جاري إعادة التوجيه...',
+        successRegister: 'تم إنشاء الحساب! تحقق من هاتفك.',
+        copied: 'تم النسخ!'
+      },
+      en: {
+        appName: 'GoWithSally',
+        appSubtitle: 'Safe Transportation for Women',
+        tabLogin: 'Login',
+        tabRegister: 'Sign Up',
+        lblEmailPhone: 'Email or Phone',
+        lblPassword: 'Password',
+        lblFirstName: 'First Name',
+        lblLastName: 'Last Name',
+        lblEmail: 'Email',
+        lblPhone: 'Phone',
+        lblRemember: 'Remember me',
+        lblForgot: 'Forgot password?',
+        btnLogin: 'Sign In',
+        btnRegister: 'Create Account',
+        dividerOr: 'or',
+        testCredsTitle: 'Test Accounts',
+        adminPanelTitle: 'Admin Panel (localhost:5000/admin)',
+        driverAppTitle: 'Drivers App (localhost:3000)',
+        userAppTitle: 'Users App (localhost:3000)',
+        colRole: 'Role',
+        colEmail: 'Email',
+        colPassword: 'Password',
+        roleAdmin: 'Admin',
+        roleSupport: 'Support',
+        roleDriver: 'Drivers',
+        roleUser: 'Users',
+        btnCopy: 'Copy',
+        btnCopyPwd: 'Copy',
+        btnQuickLogin: 'Login',
+        credsNote: 'These test accounts are for development and testing only.',
+        linkTerms: 'Terms',
+        linkPrivacy: 'Privacy',
+        errorLogin: 'Invalid credentials',
+        errorServer: 'Server connection error',
+        errorRegister: 'Registration error',
+        successLogin: 'Login successful! Redirecting...',
+        successRegister: 'Account created! Check your phone.',
+        copied: 'Copied!'
+      }
+    };
+
+    let currentLanguage = localStorage.getItem('gws_language') || 'fr';
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      setLanguage(currentLanguage);
+    });
+
+    // Language Management
+    function setLanguage(lang) {
+      currentLanguage = lang;
+      localStorage.setItem('gws_language', lang);
+
+      const htmlElement = document.documentElement;
+      htmlElement.lang = lang;
+      htmlElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+      // Update active button
+      document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelector(`[onclick="setLanguage('${lang}')"]`).classList.add('active');
+
+      // Update all i18n elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang] && translations[lang][key]) {
+          el.textContent = translations[lang][key];
+        }
+      });
+
+      // Update placeholders and attributes
+      updateDynamicContent();
+    }
+
+    function updateDynamicContent() {
+      const lang = currentLanguage;
+      document.getElementById('loginIdentifier').placeholder = lang === 'ar' ? 'example@email.com' : 'email@exemple.com';
+      document.getElementById('regFirstName').placeholder = lang === 'ar' ? 'اسمك الأول' : 'Votre prénom';
+      document.getElementById('regLastName').placeholder = lang === 'ar' ? 'اسمك الأخير' : 'Votre nom';
+      document.getElementById('regEmail').placeholder = lang === 'ar' ? 'example@email.com' : 'email@exemple.com';
+      document.getElementById('regPhone').placeholder = lang === 'ar' ? '6XXXXXXXX' : '6XXXXXXXX';
+    }
+
+    // Tab Switching
+    function switchTab(tab) {
+      document.getElementById('loginForm').classList.toggle('active', tab === 'login');
+      document.getElementById('registerForm').classList.toggle('active', tab === 'register');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      hideMessages();
+    }
+
+    // Password Toggle
+    function togglePassword(inputId) {
+      const input = document.getElementById(inputId);
+      const button = event.target.closest('button');
+      const icon = button.querySelector('i');
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+      }
+    }
+
+    // Messages
+    function showError(message) {
+      document.getElementById('errorText').textContent = message;
+      document.getElementById('errorAlert').style.display = 'flex';
+      document.getElementById('successAlert').style.display = 'none';
+    }
+
+    function showSuccess(message) {
+      document.getElementById('successText').textContent = message;
+      document.getElementById('successAlert').style.display = 'flex';
+      document.getElementById('errorAlert').style.display = 'none';
+    }
+
+    function hideMessages() {
+      document.getElementById('errorAlert').style.display = 'none';
+      document.getElementById('successAlert').style.display = 'none';
+    }
+
+    // Loading State
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      loading ? btn.classList.add('loading') : btn.classList.remove('loading');
+    }
+
+    // Login Handler
+    async function handleLogin(e) {
+      e.preventDefault();
+      hideMessages();
+      setLoading('loginBtn', true);
+
+      try {
+        const identifier = document.getElementById('loginIdentifier').value;
+        const password = document.getElementById('loginPassword').value;
+        const isPhone = identifier.startsWith('+') || /^[067]/.test(identifier);
+
+        const body = { password };
+        if (isPhone) {
+          body.phone = identifier.startsWith('+212') ? identifier : '+212' + identifier;
+        } else {
+          body.email = identifier;
+        }
+
+        const response = await fetch(window.location.origin + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (data.success || data.token) {
+          const token = data.token || data.data?.token;
+          const refreshToken = data.data?.refreshToken;
+          const user = data.data?.user;
+
+          localStorage.setItem('gws_token', token);
+          if (refreshToken) localStorage.setItem('gws_refresh_token', refreshToken);
+          if (user) localStorage.setItem('gws_user', JSON.stringify(user));
+
+          showSuccess(translations[currentLanguage].successLogin);
+
+          // Load dynamic URLs from API then redirect
+          let frontendUrl = 'http://localhost:3000';
+          try {
+            const urlsRes = await fetch(window.location.origin + '/api/config/urls');
+            const urlsData = await urlsRes.json();
+            if (urlsData.success) frontendUrl = urlsData.urls.frontend || frontendUrl;
+          } catch(e) {}
+
+          setTimeout(() => {
+            const role = user?.role || 'user';
+
+            // Role-based redirect
+            if (role === 'admin' || role === 'sub_admin') {
+              // Admin/Sub-admin dashboard
+              window.location.href = `${window.location.origin}/admin`;
+            } else if (role === 'driver' || role === 'user') {
+              // Driver and User app (URL from .env)
+              window.location.href = frontendUrl;
+            } else {
+              // Default fallback
+              window.location.href = `${window.location.origin}/admin`;
+            }
+          }, 1500);
+        } else {
+          showError(data.message || translations[currentLanguage].errorLogin);
+        }
+      } catch (error) {
+        showError(translations[currentLanguage].errorServer);
+      } finally {
+        setLoading('loginBtn', false);
+      }
+    }
+
+    // Register Handler
+    async function handleRegister(e) {
+      e.preventDefault();
+      hideMessages();
+      setLoading('registerBtn', true);
+
+      try {
+        const body = {
+          firstName: document.getElementById('regFirstName').value,
+          lastName: document.getElementById('regLastName').value,
+          email: document.getElementById('regEmail').value,
+          phone: '+212' + document.getElementById('regPhone').value,
+          password: document.getElementById('regPassword').value
+        };
+
+        const response = await fetch(window.location.origin + '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess(translations[currentLanguage].successRegister);
+          setTimeout(() => {
+            switchTab('login');
+            document.getElementById('registerForm').reset();
+          }, 2000);
+        } else {
+          showError(data.message || translations[currentLanguage].errorRegister);
+        }
+      } catch (error) {
+        showError(translations[currentLanguage].errorServer);
+      } finally {
+        setLoading('registerBtn', false);
+      }
+    }
+
+    // Test Credentials
+    function toggleTestCredentials(event) {
+      event.preventDefault();
+      const header = event.currentTarget;
+      const content = document.getElementById('testCredsContent');
+      header.classList.toggle('expanded');
+      content.classList.toggle('expanded');
+    }
+
+    function copyPassword(password) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      navigator.clipboard.writeText(password).then(() => {
+        const btn = event.target.closest('button');
+        const originalText = btn.textContent;
+        btn.textContent = translations[currentLanguage].copied;
+        btn.classList.add('copied');
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(() => {
+        alert(password);
+      });
+    }
+
+    function quickLogin(email, password) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Auto-fill the login form
+      document.getElementById('loginIdentifier').value = email;
+      document.getElementById('loginPassword').value = password;
+
+      // Scroll to form
+      document.getElementById('loginForm').scrollIntoView({ behavior: 'smooth' });
+
+      // Auto-submit after a brief delay
+      setTimeout(() => {
+        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+      }, 300);
+    }
+
+    // Social Login
+    function socialLogin(provider) {
+      console.log(`Social login with ${provider} not yet implemented`);
+    }
+  </script>
+</body>
+</html>

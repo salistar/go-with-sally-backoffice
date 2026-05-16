@@ -1,0 +1,163 @@
+##############################################################################
+# GoWithSally - Testing Docker Compose Configuration
+# Usage: docker compose -f docker-compose.test.yml up -d
+# For CI/CD: docker compose -f docker-compose.test.yml up --abort-on-container-exit
+##############################################################################
+
+version: '3.8'
+
+services:
+  # MongoDB for testing
+  mongodb:
+    image: mongo:7.0
+    container_name: gowithsally-mongo-test
+    restart: on-failure
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: test
+      MONGO_INITDB_ROOT_PASSWORD: test
+      MONGO_INITDB_DATABASE: gowithsally_test
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_test_data:/data/db
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet", "localhost:27017/test", "-u", "test", "-p", "test", "--authenticationDatabase", "admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Redis for testing
+  redis:
+    image: redis:7.2-alpine
+    container_name: gowithsally-redis-test
+    restart: on-failure
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --loglevel notice
+    volumes:
+      - redis_test_data:/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Backend API for testing
+  backend:
+    build:
+      context: ./gowithsally-backend
+      dockerfile: Dockerfile
+      target: testing
+    container_name: gowithsally-backend-test
+    restart: on-failure
+    environment:
+      NODE_ENV: test
+      LOG_LEVEL: warn
+      MONGODB_URI: mongodb://test:test@mongodb:27017/gowithsally_test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      JWT_SECRET: test_secret_key_123
+      JWT_EXPIRE: 7d
+      JWT_REFRESH_SECRET: test_refresh_secret
+      JWT_REFRESH_EXPIRE: 30d
+      PORT: 5000
+      API_URL: http://localhost:5000
+      WEB_URL: http://localhost:3000
+      STRIPE_SECRET_KEY: sk_test_dummy
+      TWILIO_ACCOUNT_SID: test
+      TWILIO_AUTH_TOKEN: test
+      FACE_API_URL: http://face-api:8000
+      FACE_API_PASSWORD: test
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    volumes:
+      - ./gowithsally-backend:/app
+      - /app/node_modules
+      - test_backend_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Face API service for testing
+  face-api:
+    build:
+      context: ./gowithsally-face-api
+      dockerfile: Dockerfile
+      target: testing
+    container_name: gowithsally-face-api-test
+    restart: on-failure
+    environment:
+      APP_ENV: testing
+      LOG_LEVEL: warn
+      PORT: 8000
+      WORKERS: 1
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    volumes:
+      - ./gowithsally-face-api:/app
+      - test_faceapi_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Web service for E2E testing
+  web:
+    build:
+      context: ./gowithsally-web
+      dockerfile: Dockerfile
+      target: development
+    container_name: gowithsally-web-test
+    restart: on-failure
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  mongo_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  test_backend_logs:
+    driver: local
+  test_faceapi_logs:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+    name: test-network
