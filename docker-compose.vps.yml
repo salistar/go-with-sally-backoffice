@@ -1,39 +1,72 @@
 ##############################################################################
-# Go With Sally - Backoffice - PRODUCTION VPS (methode SallyCards)
+# Go With Sally - Backoffice - PRODUCTION (SERVEUR 2 DEDIE)
 #
-# Usage (sur le VPS, manuellement) :
-#   docker compose --env-file .env.production -f docker-compose.vps.yml pull
-#   docker compose --env-file .env.production -f docker-compose.vps.yml up -d
+# VPS dedie : gowithsally-prod (88.198.205.229, CPX52 12 vCPU / 24 GB).
+# Stack AUTONOME : Mongo + Redis DEDIES (conteneurs + volumes propres),
+# backend + web (images GHCR), Caddy (reverse-proxy + TLS Let's Encrypt auto).
 #
-# Particularites (decisions validees) :
-#   - Images PRE-BUILDEES depuis GHCR (CI deploy-prod.yml), pas de build local
-#   - Mongo & Redis : RE-UTILISE les conteneurs SallyCards existants
-#     (sallycards-mongo / sallycards-redis) via le reseau Docker partage
-#     'shared-db'. BDD dediee 'gowithsally' + index Redis dedie (3).
-#     -> AUCUNE donnee SallyCards touchee. GoWithSally n'a PAS ses propres
-#        conteneurs mongo/redis ici.
-#   - Aucun port public : tout est bind sur 127.0.0.1, expose uniquement
-#     via Cloudflare Tunnel (cloudflared systemd sur l'hote).
-#       gowithsally.salistar.com     -> web      127.0.0.1:3100
-#       api.gowithsally.salistar.com -> backend  127.0.0.1:5000
-#       aigowithsally.salistar.com   -> face-api 127.0.0.1:8000
+# Domaine : gowithsally.com
+#   https://gowithsally.com       -> web      (Caddy -> web:80)
+#   https://api.gowithsally.com   -> backend  (Caddy -> backend:5000)
 #
-#  ATTENTION RAM : la stack complete (backend + face-api + ELK) sur un
-#  CPX22 (4 GB) DEJA charge par SallyCards va saturer la memoire.
-#  -> upgrade VPS recommande (CPX32/CPX42) AVANT 'up -d', OU lancer sans
-#     le profil 'elk' :  (retirer COMPOSE_PROFILES=elk)
+# Deploiement : CI deploy-prod.yml (local -> GitHub -> Actions -> ce VPS)
 ##############################################################################
 
 name: gowithsally
 
-x-logging: &default-logging
+x-logging: &log
   driver: json-file
-  options:
-    max-size: "50m"
-    max-file: "5"
+  options: { max-size: "50m", max-file: "5" }
+
+networks:
+  gws-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:
+  backend_uploads:
+  backend_logs:
+  caddy_data:
+  caddy_config:
 
 services:
-  # ========== BACKEND API (api.gowithsally.salistar.com) ==========
+  # ========== MONGODB (dedie) ==========
+  mongo:
+    image: mongo:7
+    container_name: gws-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-gws}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: gowithsally
+    volumes:
+      - mongo_data:/data/db
+    networks: [gws-net]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging: *log
+
+  # ========== REDIS (dedie) ==========
+  redis:
+    image: redis:7-alpine
+    container_name: gws-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks: [gws-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *log
+
+  # ========== BACKEND API (api.gowithsally.com) ==========
   backend:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-salistar}/gws-backend:${IMAGE_TAG:-latest}
     container_name: gws-backend
@@ -44,74 +77,40 @@ services:
       PORT: 5000
       HOST: 0.0.0.0
       TRUST_PROXY: "true"
-      # Mongo & Redis = conteneurs SallyCards partages (reseau shared-db)
-      MONGODB_URI: ${MONGODB_URI}
-      REDIS_HOST: ${REDIS_HOST:-sallycards-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
+      MONGODB_URI: mongodb://${MONGO_USER:-gws}:${MONGO_PASSWORD}@mongo:27017/gowithsally?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      REDIS_DB: ${REDIS_DB:-3}
-      FACE_API_URL: http://face-api:8000
-      APP_URL: https://api.gowithsally.salistar.com
-      FRONTEND_URL: https://gowithsally.salistar.com
-      FACE_API_PUBLIC_URL: https://aigowithsally.salistar.com
-      CORS_ORIGINS: "https://gowithsally.salistar.com,https://api.gowithsally.salistar.com,https://aigowithsally.salistar.com"
-    ports:
-      - "127.0.0.1:5000:5000"
+      REDIS_DB: 0
+      APP_URL: https://api.gowithsally.com
+      FRONTEND_URL: https://gowithsally.com
+      CORS_ORIGINS: "https://gowithsally.com,https://api.gowithsally.com"
+    expose: ["5000"]
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
-    networks: [gws-net, shared-db]
+    networks: [gws-net]
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
       interval: 30s
       timeout: 15s
       retries: 10
       start_period: 90s
-    logging: *default-logging
+    logging: *log
     deploy:
       resources:
-        limits: { cpus: '1.5', memory: 1500M }
-        reservations: { cpus: '0.5', memory: 512M }
+        limits: { cpus: '3', memory: 3G }
+        reservations: { cpus: '1', memory: 768M }
 
-  # ========== FACE AI (aigowithsally.salistar.com) ==========
-  face-api:
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-salistar}/gws-face-api:${IMAGE_TAG:-latest}
-    container_name: gws-face-api
-    restart: always
-    env_file: .env.production
-    environment:
-      APP_ENV: production
-      PORT: 8000
-      WORKERS: ${FACE_API_WORKERS:-2}
-      LOG_LEVEL: info
-      REDIS_URL: redis://:${REDIS_PASSWORD}@${REDIS_HOST:-sallycards-redis}:6379/${FACE_REDIS_DB:-4}
-      CORS_ORIGINS: "*"
-    ports:
-      - "127.0.0.1:8000:8000"
-    volumes:
-      # Modeles ML (~2.3 GB) NON versionnes (gitignore). A provisionner sur
-      # le VPS dans ce volume — voir BACKOFFICE-DEPLOY.md (point ouvert).
-      - face_models:/app/models:ro
-    networks: [gws-net, shared-db]
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health/ping\")' || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      start_period: 120s
-    logging: *default-logging
-    deploy:
-      resources:
-        limits: { cpus: '2', memory: 4G }
-        reservations: { cpus: '1', memory: 1G }
-
-  # ========== WEB FRONTEND (gowithsally.salistar.com) ==========
+  # ========== WEB FRONTEND (gowithsally.com) ==========
   web:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-salistar}/gws-web:${IMAGE_TAG:-latest}
     container_name: gws-web
     restart: always
-    ports:
-      - "127.0.0.1:3100:80"
+    expose: ["80"]
     networks: [gws-net]
     depends_on: [backend]
     healthcheck:
@@ -120,76 +119,20 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-    logging: *default-logging
-    deploy:
-      resources:
-        limits: { cpus: '0.5', memory: 256M }
+    logging: *log
 
-  # ========== ELK (profil 'elk' — desactivable si RAM limitee) ==========
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
-    container_name: gws-elasticsearch
+  # ========== CADDY (reverse-proxy + TLS Let's Encrypt automatique) ==========
+  caddy:
+    image: caddy:2-alpine
+    container_name: gws-caddy
     restart: always
-    profiles: ["elk"]
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx1g"
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-    networks: [gws-net]
-    logging: *default-logging
-    deploy:
-      resources:
-        limits: { cpus: '1.5', memory: 2G }
-
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.12.0
-    container_name: gws-logstash
-    restart: always
-    profiles: ["elk"]
-    volumes:
-      - ./gowithsally-backend/config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
-    networks: [gws-net]
-    depends_on: [elasticsearch]
-    logging: *default-logging
-    deploy:
-      resources:
-        limits: { cpus: '0.5', memory: 768M }
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.0
-    container_name: gws-kibana
-    restart: always
-    profiles: ["elk"]
-    environment:
-      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
     ports:
-      - "127.0.0.1:5601:5601"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks: [gws-net]
-    depends_on: [elasticsearch]
-    logging: *default-logging
-    deploy:
-      resources:
-        limits: { cpus: '0.5', memory: 768M }
-
-volumes:
-  backend_uploads:
-  backend_logs:
-  face_models:
-  es_data:
-
-networks:
-  gws-net:
-    name: gws-net
-    driver: bridge
-  # Reseau partage ou vivent sallycards-mongo / sallycards-redis.
-  # A creer une fois sur le VPS + y connecter les conteneurs SallyCards :
-  #   docker network create shared-db
-  #   docker network connect shared-db sallycards-mongo
-  #   docker network connect shared-db sallycards-redis
-  shared-db:
-    external: true
-    name: ${SHARED_DB_NETWORK:-shared-db}
+    depends_on: [web, backend]
+    logging: *log

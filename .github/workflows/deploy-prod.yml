@@ -103,11 +103,10 @@ jobs:
               echo "ERREUR: .env.production absent sur le VPS (prerequis non fait)"; exit 1
             fi
             export IMAGE_TAG="$SHA"
-            # Deploie UNIQUEMENT backend + web (pas de face-api : modeles ML
-            # absents + RAM ; pas d'ELK). Mongo/Redis = conteneurs SallyCards
-            # reutilises via le reseau externe (SHARED_DB_NETWORK).
+            # SERVEUR 2 DEDIE : stack autonome complete = mongo + redis
+            # (conteneurs dedies) + backend + web + caddy (TLS auto).
             docker compose --env-file .env.production -f docker-compose.vps.yml pull backend web
-            docker compose --env-file .env.production -f docker-compose.vps.yml up -d backend web
+            docker compose --env-file .env.production -f docker-compose.vps.yml up -d
             docker image prune -f
             docker compose --env-file .env.production -f docker-compose.vps.yml ps
 
@@ -143,8 +142,8 @@ jobs:
             set -e
             echo "--- conteneurs ---"
             docker ps --filter name=gws- --format "{{.Names}} | {{.Status}}"
-            echo "--- backend /health ---"
-            curl -fsS http://127.0.0.1:5000/health && echo
-            echo "--- web ---"
-            curl -fsSI http://127.0.0.1:3100/ | head -n1
-            echo "Health-check OK (acces public via Cloudflare a configurer separement)"
+            echo "--- backend /health (interne) ---"
+            docker exec gws-backend wget -qO- http://localhost:5000/health && echo
+            echo "--- web (interne) ---"
+            docker exec gws-caddy wget -qO- http://web:80/ | grep -o 'Go With Sally' | head -n1 || true
+            echo "Health-check OK (TLS public via Caddy/Let's Encrypt - DNS gowithsally.com requis)"

@@ -1,0 +1,23 @@
+# Go With Sally - Caddy reverse proxy + TLS Let's Encrypt automatique
+# (Serveur 2 dedie - domaine gowithsally.com)
+#
+# NB pour l'emission des certificats : les enregistrements DNS Cloudflare
+# gowithsally.com et api.gowithsally.com doivent etre en mode "DNS only"
+# (nuage GRIS) le temps que Caddy obtienne les certificats via HTTP-01,
+# puis peuvent etre repasses en "Proxied" si souhaite (Full/strict).
+
+{
+	email salistarcompany@gmail.com
+}
+
+gowithsally.com, www.gowithsally.com {
+	encode gzip zstd
+	reverse_proxy web:80
+}
+
+api.gowithsally.com {
+	encode gzip zstd
+	reverse_proxy backend:5000 {
+		header_up X-Forwarded-Proto https
+	}
+}
