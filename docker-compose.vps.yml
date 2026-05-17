@@ -29,6 +29,11 @@ volumes:
   backend_logs:
   caddy_data:
   caddy_config:
+  face_models:
+    # Provisionne par le CI (deploy-prod.yml) AVANT 'up' : modeles ML
+    # telecharges depuis la GitHub Release 'models-v1' du repo backoffice.
+    name: gowithsally_face_models
+    external: true
 
 services:
   # ========== MONGODB (dedie) ==========
@@ -120,6 +125,37 @@ services:
       retries: 3
       start_period: 15s
     logging: *log
+
+  # ========== FACE AI (ai.gowithsally.com) ==========
+  face-api:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER:-salistar}/gws-face-api:${IMAGE_TAG:-latest}
+    container_name: gws-face-api
+    restart: always
+    env_file: .env.production
+    environment:
+      APP_ENV: production
+      PORT: 8000
+      WORKERS: ${FACE_API_WORKERS:-2}
+      LOG_LEVEL: info
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/4
+      CORS_ORIGINS: "*"
+    expose: ["8000"]
+    volumes:
+      - face_models:/app/models:ro
+    networks: [gws-net]
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health/ping\")' || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    logging: *log
+    deploy:
+      resources:
+        limits: { cpus: '4', memory: 6G }
+        reservations: { cpus: '1', memory: 1G }
 
   # ========== CADDY (reverse-proxy + TLS Let's Encrypt automatique) ==========
   caddy:

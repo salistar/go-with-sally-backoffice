@@ -21,3 +21,8 @@ api.gowithsally.com {
 		header_up X-Forwarded-Proto https
 	}
 }
+
+ai.gowithsally.com {
+	encode gzip zstd
+	reverse_proxy face-api:8000
+}

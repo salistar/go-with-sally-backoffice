@@ -50,8 +50,12 @@ jobs:
             context: ./gowithsally-web
             file: ./gowithsally-web/Dockerfile
             target: ""
-          # gws-face-api : NON build/deploye (modeles ML ~2.3 GB absents
-          # de l'image + RAM VPS insuffisante). A reactiver ulterieurement.
+          - name: gws-face-api
+            context: ./gowithsally-face-api
+            file: ./gowithsally-face-api/Dockerfile
+            target: production
+            # Modeles ML hors image : provisionnes sur le VPS depuis la
+            # GitHub Release models-v1 par le job 'deploy' avant 'up'.
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -103,9 +107,24 @@ jobs:
               echo "ERREUR: .env.production absent sur le VPS (prerequis non fait)"; exit 1
             fi
             export IMAGE_TAG="$SHA"
-            # SERVEUR 2 DEDIE : stack autonome complete = mongo + redis
-            # (conteneurs dedies) + backend + web + caddy (TLS auto).
-            docker compose --env-file .env.production -f docker-compose.vps.yml pull backend web
+            # ---- Provisioning modeles ML face-api (GitHub Release models-v1) ----
+            REL="https://github.com/salistar/go-with-sally-backoffice/releases/download/models-v1"
+            docker volume create gowithsally_face_models >/dev/null
+            if [ -z "$(docker run --rm -v gowithsally_face_models:/m alpine sh -c 'ls -A /m 2>/dev/null')" ]; then
+              echo ">> Modeles absents - telechargement depuis Release models-v1"
+              tmp=$(mktemp -d)
+              for m in age antispoof face facecount gender headcount voice_gender; do
+                echo "   - $m.tar.gz"; curl -fsSL --retry 4 -o "$tmp/$m.tar.gz" "$REL/$m.tar.gz"
+              done
+              docker run --rm -v gowithsally_face_models:/models -v "$tmp":/src alpine \
+                sh -c 'cd /models && for f in /src/*.tar.gz; do tar xzf "$f"; done && ls -1 /models'
+              rm -rf "$tmp"
+            else
+              echo ">> Modeles deja presents dans le volume - skip"
+            fi
+            # SERVEUR 2 DEDIE : stack complete = mongo + redis + backend +
+            # web + face-api + caddy (TLS auto).
+            docker compose --env-file .env.production -f docker-compose.vps.yml pull backend web face-api
             docker compose --env-file .env.production -f docker-compose.vps.yml up -d
             docker image prune -f
             docker compose --env-file .env.production -f docker-compose.vps.yml ps
