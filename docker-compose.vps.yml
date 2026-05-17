@@ -99,7 +99,8 @@ services:
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      # node present dans l'image backend -> fiable (busybox wget faux-negatif)
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 30s
       timeout: 15s
       retries: 10
@@ -119,11 +120,12 @@ services:
     networks: [gws-net]
     depends_on: [backend]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ | grep -q 'Go With Sally' || exit 1"]
+      # /health = endpoint dedie (curl present dans l'image web) -> fiable
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 15s
+      retries: 5
+      start_period: 20s
     logging: *log
 
   # ========== FACE AI (ai.gowithsally.com) ==========
